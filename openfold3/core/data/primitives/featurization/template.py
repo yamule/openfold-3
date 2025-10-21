@@ -15,6 +15,7 @@
 """This module contains building blocks for template feature generation."""
 
 import dataclasses
+import logging
 
 import biotite.structure as struc
 import numpy as np
@@ -28,6 +29,8 @@ from openfold3.core.data.resources.residues import (
 )
 from openfold3.core.utils.all_atom_multimer import make_transform_from_reference
 from openfold3.core.utils.geometry.vector import Vec3Array
+
+logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass(frozen=False)
@@ -107,6 +110,9 @@ def create_template_feature_precursor_of3(
                 # cases to be able to include them or skip them in a way that allows for
                 # retaining the correct number of sampled templates
                 if sum(is_pseudo_beta_atom) != len(residue_starts):
+                    logger.warning(
+                        "Skipping template with non-canonical/missing C-beta atoms."
+                    )
                     continue
 
                 pseudo_beta_atom_coords[template_idx, query_token_positions, :] = (
@@ -144,7 +150,8 @@ def create_template_feature_precursor_of3(
                 )
 
                 template_idx += 1
-            except Exception as _:
+            except Exception as e:
+                logger.warning(f"Skipping template with exception: {e}")
                 continue
 
     return OF3TemplateFeaturePrecursor(
