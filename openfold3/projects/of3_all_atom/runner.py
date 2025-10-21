@@ -24,6 +24,7 @@ from pathlib import Path
 
 import pytorch_lightning as pl
 import torch
+import torch.distributed as dist
 from torchmetrics import MeanMetric, MetricCollection, PearsonCorrCoef
 
 from openfold3.core.loss.loss_module import OpenFold3Loss
@@ -73,6 +74,12 @@ class OpenFold3AllAtom(ModelRunner):
         self.model_selection_weights = model_selection_metric_weights_config[
             self.config.settings.model_selection_weight_scheme
         ]
+
+        self.per_sample_grad_clipping = (
+            model_config.settings.gradient_clipping.per_sample_clipping
+        )
+        self.max_grad_norm = model_config.settings.gradient_clipping.clip_val
+        self.automatic_optimization = not self.per_sample_grad_clipping
 
     def setup(self, stage: str):
         # Setup metrics
@@ -305,7 +312,85 @@ class OpenFold3AllAtom(ModelRunner):
                     sync_dist=False,
                 )
 
-    def training_step(self, batch, batch_idx):
+    def _clip_per_sample_grads(self):
+        # Calculate the total norm of all parameter gradients for this
+        # single example.
+        grads = (p.grad.detach() for p in self.model.parameters() if p.grad is not None)
+        global_norm = torch.sqrt(sum([torch.sum(g.float() ** 2) for g in grads]))
+
+        # Clip norm and compute rescale factor
+        # Note: We use maximum here to avoid CPU <-> GPU synchronization that can
+        # occur with additional conditional `if global_norm > self.max_grad_norm`
+        max_norm = torch.tensor(self.max_grad_norm, device=global_norm.device)
+        clip_coef = self.max_grad_norm / torch.maximum(global_norm, max_norm)
+
+        # Rescale gradients
+        for p in self.model.parameters():
+            if p.grad is not None:
+                p.grad.detach().mul_(clip_coef.to(p.dtype))
+
+    def _average_and_sync_grads(self):
+        # Average and sync the clipped per-example gradients across all GPUs.
+        if self.trainer.world_size > 1:
+            for p in self.model.parameters():
+                if p.grad is not None:
+                    dist.all_reduce(p.grad, op=dist.ReduceOp.AVG)
+
+    def _training_step_manual_clip(self, batch):
+        assert len(batch["pdb_id"]) == 1, (
+            "Currently only mini-batch size of 1 per GPU is supported."
+        )
+        assert self.trainer.accumulate_grad_batches == 1, (
+            "Gradient accumulation is not supported with per-sample gradient clipping."
+        )
+        assert not self.deepspeed_is_initialized, (
+            "Per-sample gradient clipping is not supported with DeepSpeed."
+        )
+
+        example_feat = next(
+            iter(v for v in batch.values() if isinstance(v, torch.Tensor))
+        )
+        if self.ema.device != example_feat.device:
+            self.ema.to(example_feat.device)
+
+        pdb_id = ", ".join(batch["pdb_id"])
+        preferred_chain_or_interface = batch["preferred_chain_or_interface"]
+        logger.debug(
+            f"Started model forward pass for {pdb_id} with preferred chain or "
+            f"interface {preferred_chain_or_interface} on rank {self.global_rank} "
+            f"step {self.global_step}"
+        )
+
+        opt = self.optimizers()
+        opt.zero_grad()
+
+        try:
+            # Run the model
+            batch, outputs = self.model(batch)
+
+            # Compute loss
+            loss, loss_breakdown = self.loss(batch, outputs, _return_breakdown=True)
+
+            self.manual_backward(loss)
+
+            self._clip_per_sample_grads()
+            self._average_and_sync_grads()
+
+            opt.step()
+
+            # Log it
+            self._log(loss_breakdown, batch, outputs)
+
+        except Exception:
+            logger.exception(
+                f"Train step failed with pdb id {pdb_id} with "
+                f"preferred chain or interface {preferred_chain_or_interface}"
+            )
+            raise
+
+        return loss
+
+    def _training_step(self, batch):
         example_feat = next(
             iter(v for v in batch.values() if isinstance(v, torch.Tensor))
         )
@@ -338,6 +423,12 @@ class OpenFold3AllAtom(ModelRunner):
             raise
 
         return loss
+
+    def training_step(self, batch, batch_idx):
+        if self.per_sample_grad_clipping:
+            return self._training_step_manual_clip(batch=batch)
+        else:
+            return self._training_step(batch=batch)
 
     def eval_step(self, batch, batch_idx):
         # At the start of validation, load the EMA weights

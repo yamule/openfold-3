@@ -142,7 +142,10 @@ model_config = mlc.ConfigDict(
                 "decay_factor": 0.95,
             },
             "ema": {"decay": 0.999, "submodules_to_update": None},
-            "gradient_clipping": 10.0,
+            "gradient_clipping": {
+                "per_sample_clipping": True,
+                "clip_val": 10.0,
+            },
             "model_selection_weight_scheme": "initial_training",
             "debug": {
                 "log_extra_grad_metrics": False,

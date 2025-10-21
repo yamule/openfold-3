@@ -277,11 +277,19 @@ class ExperimentRunner(ABC):
                 "strategy": self.strategy,
                 "callbacks": self.callbacks,
                 "logger": self.loggers,
-                # If DeepSpeed is enabled, these values will be passed to the DS config
-                "gradient_clip_val": self.model_config.settings.gradient_clipping,
-                "gradient_clip_algorithm": "norm",
             }
         )
+
+        if not self.model_config.settings.gradient_clipping.per_sample_clipping:
+            clip_val = self.model_config.settings.gradient_clipping.clip_val
+            trainer_args.update(
+                {
+                    # If DeepSpeed is enabled, these values will be passed to the
+                    # DS config
+                    "gradient_clip_val": clip_val,
+                    "gradient_clip_algorithm": "norm",
+                }
+            )
 
         return pl.Trainer(**trainer_args)
 
