@@ -148,6 +148,7 @@ model_config = mlc.ConfigDict(
             },
             "model_selection_weight_scheme": "initial_training",
             "debug": {
+                "log_grad_norm": False,
                 "log_extra_grad_metrics": False,
                 "profile_grad_logging": False,
             },

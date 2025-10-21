@@ -318,6 +318,17 @@ class OpenFold3AllAtom(ModelRunner):
         grads = (p.grad.detach() for p in self.model.parameters() if p.grad is not None)
         global_norm = torch.sqrt(sum([torch.sum(g.float() ** 2) for g in grads]))
 
+        if self.logger is not None and self.config.settings.debug.log_grad_norm:
+            self.log(
+                "grad_norm",
+                global_norm,
+                on_step=True,
+                on_epoch=False,
+                prog_bar=False,
+                logger=True,
+                sync_dist=True,
+            )
+
         # Clip norm and compute rescale factor
         # Note: We use maximum here to avoid CPU <-> GPU synchronization that can
         # occur with additional conditional `if global_norm > self.max_grad_norm`
