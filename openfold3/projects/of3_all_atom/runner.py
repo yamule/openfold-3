@@ -24,6 +24,7 @@ from pathlib import Path
 
 import pytorch_lightning as pl
 import torch
+from pytorch_lightning.trainer import call
 from torchmetrics import MeanMetric, MetricCollection, PearsonCorrCoef
 
 from openfold3.core.loss.loss_module import OpenFold3Loss
@@ -351,6 +352,13 @@ class OpenFold3AllAtom(ModelRunner):
         )
 
         opt = self.optimizers()
+
+        # zero_grad() must be called on every micro-batch to ensure
+        # self.manual_backward() sets p.grad instead of adding to it
+        # when doing gradient accumulation.
+        # It's probably overkill to handle the clipping this exactly
+        # instead of just using the averaged microbatch, but I'll revisit
+        # that later if needed.
         opt.zero_grad()
 
         try:
@@ -377,8 +385,19 @@ class OpenFold3AllAtom(ModelRunner):
                 # Average and sync grads
                 self.grad_manager.sync_grads()
 
+                # Manually call this hook since it's bypassed in manual opt loop
+                call._call_lightning_module_hook(
+                    self.trainer, "on_before_optimizer_step", opt
+                )
+
                 opt.step()
                 self.lr_schedulers().step()
+
+                # Manually trigger the `on_before_zero_grad` hook after the step
+                # Ensures EMA uses the latest weights, despite hook name timing
+                call._call_lightning_module_hook(
+                    self.trainer, "on_before_zero_grad", opt
+                )
 
                 # Zero the grad accumulator
                 self.grad_manager.reset_accumulator()
