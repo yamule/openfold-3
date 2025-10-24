@@ -402,8 +402,8 @@ class OpenFold3AllAtom(ModelRunner):
                 # Zero the grad accumulator
                 self.grad_manager.reset_accumulator()
 
-            # Log it
-            self._log(loss_breakdown, batch, outputs)
+            if self.logger is not None:
+                self._log(loss_breakdown, batch, outputs)
 
         except Exception:
             logger.exception(
@@ -441,8 +441,8 @@ class OpenFold3AllAtom(ModelRunner):
             # Compute loss
             loss, loss_breakdown = self.loss(batch, outputs, _return_breakdown=True)
 
-            # Log it
-            self._log(loss_breakdown, batch, outputs)
+            if self.logger is not None:
+                self._log(loss_breakdown, batch, outputs)
 
         except Exception:
             logger.exception(
@@ -492,7 +492,8 @@ class OpenFold3AllAtom(ModelRunner):
             # Compute loss and other metrics
             _, loss_breakdown = self.loss(batch, outputs, _return_breakdown=True)
 
-            self._log(loss_breakdown, batch, outputs, train=False)
+            if self.logger is not None:
+                self._log(loss_breakdown, batch, outputs, train=False)
 
         except Exception:
             logger.exception(f"Validation step failed with pdb id {', '.join(pdb_id)}")
@@ -638,13 +639,17 @@ class OpenFold3AllAtom(ModelRunner):
 
     def on_train_epoch_end(self):
         """Log aggregated epoch metrics for training."""
-        self._log_epoch_metrics(metrics=self.train_losses)
-        self._log_epoch_metrics(metrics=self.train_metrics)
+        if self.logger is not None:
+            self._log_epoch_metrics(metrics=self.train_losses)
+            self._log_epoch_metrics(metrics=self.train_metrics)
 
     def on_validation_epoch_end(self):
         """Log aggregated epoch metrics for validation."""
-        self._log_epoch_metrics(metrics=self.val_losses)
-        self._log_epoch_metrics(metrics=self.val_metrics, compute_model_selection=True)
+        if self.logger is not None:
+            self._log_epoch_metrics(metrics=self.val_losses)
+            self._log_epoch_metrics(
+                metrics=self.val_metrics, compute_model_selection=True
+            )
 
         # Restore the model weights to normal
         self.model.load_state_dict(self.cached_weights)
