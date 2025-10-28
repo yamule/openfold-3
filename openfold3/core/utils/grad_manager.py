@@ -79,7 +79,8 @@ class PerSampleGradManager:
 
         if self._logger is not None and self.log_grad_norm:
             self._logger.log_metrics(
-                {"train/grad_norm": global_norm}, step=self._trainer.global_step
+                {"extra_gradients/global_grad_norm": global_norm},
+                step=self._trainer.global_step,
             )
 
         # Clip norm and compute rescale factor

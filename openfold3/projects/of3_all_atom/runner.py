@@ -402,8 +402,8 @@ class OpenFold3AllAtom(ModelRunner):
                 # Zero the grad accumulator
                 self.grad_manager.reset_accumulator()
 
-            if self.logger is not None:
-                self._log(loss_breakdown, batch, outputs)
+                if self.logger is not None:
+                    self._log(loss_breakdown, batch, outputs)
 
         except Exception:
             logger.exception(
@@ -560,10 +560,11 @@ class OpenFold3AllAtom(ModelRunner):
         # TODO: Set this to log-level INFO and configure per-module log-levels in a more
         # principled way
         timing_context = partial(PerformanceTimer, logger=logger, level=logging.WARNING)
+        log_timing = log_grad_metrics and debug_settings.profile_grad_logging
 
         context = (
             timing_context("Extra-gradient fetching and calculation")
-            if log_grad_metrics and debug_settings.profile_grad_logging
+            if log_timing
             else nullcontext()
         )
 
@@ -591,10 +592,17 @@ class OpenFold3AllAtom(ModelRunner):
                     single_transition_grads[f"{tag}_max"] = grad.abs().max().item()
 
         if log_grad_metrics:
-            with timing_context("Extra-gradient logging"):
+            context = (
+                timing_context("Extra-gradient logging")
+                if log_timing
+                else nullcontext()
+            )
+            with context:
                 # NOTE: This out-of-schedule logging might interact a bit weirdly with
                 # the WandB Step, so always plot against trainer/global_step
-                self.logger.log_metrics(single_transition_grads, step=self.global_step)
+                self.logger.log_metrics(
+                    single_transition_grads, step=self.trainer.global_step
+                )
 
     def _log_epoch_metrics(
         self, metrics: MetricCollection, compute_model_selection: bool = False
