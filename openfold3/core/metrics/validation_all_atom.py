@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from itertools import combinations, combinations_with_replacement
 from typing import Literal
@@ -462,14 +462,47 @@ class DockQResult:
             Chain ID pairs to molecule types.
         chain_pair_to_n_contacts:
             Chain ID pairs to number of residue pairs in contact at the FNAT threshold.
-        chain_pair_to_dockq:
+        chain_pair_to_n_if_res:
             Chain ID pairs to number of contacting residues at the FNAT threshold.
     """
 
     chain_pair_to_dockq: dict = field(default_factory=dict)
     chain_pair_to_moltype: dict = field(default_factory=dict)
     chain_pair_to_n_contacts: dict = field(default_factory=dict)
-    chain_pair_to_dockq: dict = field(default_factory=dict)
+    chain_pair_to_n_if_res: dict = field(default_factory=dict)
+
+    def iter_pairs(
+        self,
+    ) -> Iterator[
+        tuple[
+            tuple[int, int], torch.Tensor, tuple[str, str], torch.Tensor, torch.Tensor
+        ]
+    ]:
+        """
+        Yields (chain_pair, dockq, moltype, n_contacts, n_if_res).
+        """
+        keys = self.chain_pair_to_dockq.keys()
+        # Check that all dicts have identical keys:
+        if not (
+            keys
+            == self.chain_pair_to_moltype.keys()
+            == self.chain_pair_to_n_contacts.keys()
+            == self.chain_pair_to_n_if_res.keys()
+        ):
+            print(keys)
+            print(self.chain_pair_to_moltype.keys())
+            print(self.chain_pair_to_n_contacts.keys())
+            print(self.chain_pair_to_n_if_res.keys())
+            raise ValueError("DockQResult keys don't match.")
+
+        for cp in keys:
+            yield (
+                cp,
+                self.chain_pair_to_dockq[cp],
+                self.chain_pair_to_moltype[cp],
+                self.chain_pair_to_n_contacts[cp],
+                self.chain_pair_to_n_if_res[cp],
+            )
 
 
 def dockq(
@@ -564,10 +597,6 @@ def dockq(
     for ci, cj in combinations(chain_id_polymer, 2):
         # Add moltype data
         chain_id_pair = (ci.item(), cj.item())
-        dockq_result.chain_pair_to_moltype[chain_id_pair] = (
-            chain_id_to_moltype[ci.item()],
-            chain_id_to_moltype[cj.item()],
-        )
 
         # Chain masks
         is_ci = (asym_id_atomized == ci) & all_atom_mask.bool()
@@ -758,7 +787,7 @@ def dockq(
             mobile_positions=pred_coords_if_bb,
             target_positions=gt_coords_if_bb,
             positions_mask=torch.ones(
-                pred_coords_if_bb.shape[:-1], device=pred_coords_rec_bb.device
+                pred_coords_if_bb.shape[:-1], device=pred_coords_if_bb.device
             ),
         )
         pred_coords_if_bb_transformed = apply_transformation(
@@ -778,10 +807,12 @@ def dockq(
             + (1.0 / (1.0 + (irmsd_score / d2) ** 2)).view(bs)
         ) / 3.0
 
+        dockq_result.chain_pair_to_moltype[chain_id_pair] = (
+            chain_id_to_moltype[ci.item()],
+            chain_id_to_moltype[cj.item()],
+        )
         dockq_result.chain_pair_to_dockq[chain_id_pair] = dockq_score
-
-        # - handle cases without valid interfaces due to continues
-
+    print(dockq_result)
     return dockq_result
 
 
@@ -898,7 +929,7 @@ def dockq_full_complex(
         )
         dockq_scores_weighted = torch.sum(dockq_scores * weights, dim=-1)
 
-        metric_name = f"val/dockq_{moltype_pair[0]}_{moltype_pair[1]}"
+        metric_name = f"dockq_{moltype_pair[0]}_{moltype_pair[1]}"
         out[f"{metric_name}_uw"] = dockq_scores_unweighted
         out[f"{metric_name}_w"] = dockq_scores_weighted
 
@@ -2251,7 +2282,7 @@ def get_metrics(
             ref_atom_name_chars_atomized = expand_sample_dim(
                 batch["ref_atom_name_chars"]
             )
-            dockq_metrics = dockq(
+            dockq_metrics = dockq_full_complex(
                 pred_coords=pred_coords,
                 gt_coords=gt_coords,
                 all_atom_mask=all_atom_mask,
