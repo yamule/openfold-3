@@ -348,6 +348,11 @@ class OpenFold3AllAtom(ModelRunner):
 
         pdb_id = ", ".join(batch["pdb_id"])
         preferred_chain_or_interface = batch["preferred_chain_or_interface"]
+        logging_info = {
+            "pdb_id": pdb_id,
+            "preferred_chain_or_interface": preferred_chain_or_interface,
+        }
+
         logger.debug(
             f"Started model forward pass for {pdb_id} with preferred chain or "
             f"interface {preferred_chain_or_interface} on rank {self.global_rank} "
@@ -382,11 +387,13 @@ class OpenFold3AllAtom(ModelRunner):
             # manual_backward and break the per-sample grad clipping
             with sync_context:
                 self.manual_backward(loss)
-                self.grad_manager.clip_and_accumulate()
+                self.grad_manager.clip_and_accumulate(logging_info=logging_info)
 
             if self.grad_manager.is_step_ready(batch_idx):
                 # Average and sync grads
                 self.grad_manager.sync_grads()
+
+                self.grad_manager.log_average_grad_norm()
 
                 # Manually call this hook since it's bypassed in manual opt loop
                 call._call_lightning_module_hook(
@@ -432,7 +439,7 @@ class OpenFold3AllAtom(ModelRunner):
                 #  instead and just bypass PL self.log() entirely.
                 self.log(
                     "step",
-                    float(self.global_step),
+                    self.global_step,
                     on_step=True,
                     on_epoch=False,
                     logger=True,
