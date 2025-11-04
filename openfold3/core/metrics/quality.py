@@ -489,10 +489,6 @@ class DockQResult:
             == self.chain_pair_to_n_contacts.keys()
             == self.chain_pair_to_n_if_res.keys()
         ):
-            print(keys)
-            print(self.chain_pair_to_moltype.keys())
-            print(self.chain_pair_to_n_contacts.keys())
-            print(self.chain_pair_to_n_if_res.keys())
             raise ValueError("DockQResult keys don't match.")
 
         for cp in keys:
