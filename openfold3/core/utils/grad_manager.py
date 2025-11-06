@@ -146,23 +146,9 @@ class PerSampleGradManager:
         if self.max_grad_norm is None:
             return
 
-        # Only start logging unclipped grads after warmup
-        warning_threshold = self.max_grad_norm * 5.0
-        per_sample_global_norm = global_norm.item()
-        if (
-            logging_info is not None
-            and self._trainer.global_step > 1000
-            and per_sample_global_norm > warning_threshold
-        ):
-            pdb_id = logging_info.get("pdb_id")
-            preferred_chain_or_interface = logging_info.get(
-                "preferred_chain_or_interface"
-            )
-            logger.warning(
-                f"Large gradient norm for {pdb_id} with preferred chain or interface "
-                f"{preferred_chain_or_interface} on rank {self._trainer.global_rank} "
-                f"step {self._trainer.global_step}: {per_sample_global_norm}"
-            )
+        self.log_outlier_samples(
+            logging_info=logging_info, global_norm=global_norm.item()
+        )
 
         # Clip norm and compute rescale factor
         # Note: We use maximum here to avoid CPU <-> GPU synchronization that can
@@ -192,20 +178,7 @@ class PerSampleGradManager:
 
         global_count = local_count.item()
 
-        # Log the average unclipped per-sample norm using the metric
-        if global_count > 0 and self.log_grad_norm:
-            avg_per_sample_norm = self.avg_unclipped_norm_metric.compute()
-            max_per_sample_norm = self.max_unclipped_norm_metric.compute()
-
-            if self._logger is not None:
-                self._logger.log_metrics(
-                    {"extra_gradients/avg_unclipped_grad_norm": avg_per_sample_norm},
-                    step=self._trainer.global_step,
-                )
-                self._logger.log_metrics(
-                    {"extra_gradients/max_unclipped_grad_norm": max_per_sample_norm},
-                    step=self._trainer.global_step,
-                )
+        self.log_unclipped_grad_metrics(global_count=global_count)
 
         # If no samples were processed (edge case)
         if global_count == 0:
@@ -241,27 +214,6 @@ class PerSampleGradManager:
 
         for p, new_grad in zip(params_with_grad, new_grads):
             p.grad.copy_(new_grad)
-
-    @torch.no_grad()
-    def log_average_grad_norm(self):
-        """
-        Calculates and logs the global norm of the final, averaged gradients.
-        This should be called after sync_grads() and before optimizer.step().
-        """
-        if not self.log_grad_norm or self._logger is None:
-            return
-
-        global_norm, params_with_grad = compute_global_norm(
-            parameters=self._params_to_update.values()
-        )
-
-        if not params_with_grad:
-            return
-
-        self._logger.log_metrics(
-            {"extra_gradients/avg_clipped_grad_norm": global_norm},
-            step=self._trainer.global_step,
-        )
 
     @torch.no_grad()
     def clip_and_accumulate(self, logging_info: dict | None = None):
@@ -317,6 +269,75 @@ class PerSampleGradManager:
         if self.log_grad_norm:
             self.avg_unclipped_norm_metric.reset()
             self.max_unclipped_norm_metric.reset()
+
+    @torch.no_grad()
+    def log_outlier_samples(
+        self,
+        logging_info: dict | None,
+        global_norm: float,
+        warning_norm_multiplier: float = 5.0,
+        log_after_step: int = 1000,
+    ):
+        # TODO: Tune thresholds and make this more informative
+
+        # Only start logging outlier unclipped grads after warmup by default
+        warning_threshold = self.max_grad_norm * warning_norm_multiplier
+        if (
+            logging_info is not None
+            and self._trainer.global_step > log_after_step
+            and global_norm > warning_threshold
+        ):
+            pdb_id = logging_info.get("pdb_id")
+            preferred_chain_or_interface = logging_info.get(
+                "preferred_chain_or_interface"
+            )
+            logger.warning(
+                f"Large gradient norm for {pdb_id} with preferred chain or interface "
+                f"{preferred_chain_or_interface} on rank {self._trainer.global_rank} "
+                f"step {self._trainer.global_step}: {global_norm}"
+            )
+
+    @torch.no_grad()
+    def log_unclipped_grad_metrics(self, global_count: int):
+        """
+        Logs the average and max of the unclipped per-sample gradient norms
+        seen during accumulation.
+        This should be called after clip_and_accumulate() and before grads are synced.
+        """
+        if global_count > 0 and self.log_grad_norm:
+            avg_per_sample_norm = self.avg_unclipped_norm_metric.compute()
+            max_per_sample_norm = self.max_unclipped_norm_metric.compute()
+
+            if self._logger is not None:
+                self._logger.log_metrics(
+                    {"extra_gradients/avg_unclipped_grad_norm": avg_per_sample_norm},
+                    step=self._trainer.global_step,
+                )
+                self._logger.log_metrics(
+                    {"extra_gradients/max_unclipped_grad_norm": max_per_sample_norm},
+                    step=self._trainer.global_step,
+                )
+
+    @torch.no_grad()
+    def log_average_grad_norm(self):
+        """
+        Calculates and logs the global norm of the final, averaged gradients.
+        This should be called after sync_grads() and before optimizer.step().
+        """
+        if not self.log_grad_norm or self._logger is None:
+            return
+
+        global_norm, params_with_grad = compute_global_norm(
+            parameters=self._params_to_update.values()
+        )
+
+        if not params_with_grad:
+            return
+
+        self._logger.log_metrics(
+            {"extra_gradients/avg_clipped_grad_norm": global_norm},
+            step=self._trainer.global_step,
+        )
 
     @property
     def device(self):
