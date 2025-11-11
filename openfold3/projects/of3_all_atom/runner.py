@@ -349,9 +349,7 @@ class OpenFold3AllAtom(ModelRunner):
             "Per-sample gradient clipping is only supported with DDPStrategy."
         )
 
-        example_feat = next(
-            iter(v for v in batch.values() if isinstance(v, torch.Tensor))
-        )
+        example_feat = batch["token_mask"]
         if self.ema.device != example_feat.device:
             self.ema.to(example_feat.device)
 
@@ -403,7 +401,7 @@ class OpenFold3AllAtom(ModelRunner):
 
             if self._is_opt_step_ready(batch_idx):
                 # Average and sync grads
-                self.grad_manager.sync_grads()
+                self.grad_manager.sync_and_average_grads()
 
                 self.grad_manager.log_average_grad_norm()
 
@@ -470,9 +468,7 @@ class OpenFold3AllAtom(ModelRunner):
         return loss
 
     def _training_step(self, batch):
-        example_feat = next(
-            iter(v for v in batch.values() if isinstance(v, torch.Tensor))
-        )
+        example_feat = batch["token_mask"]
         if self.ema.device != example_feat.device:
             self.ema.to(example_feat.device)
 
@@ -731,18 +727,21 @@ class OpenFold3AllAtom(ModelRunner):
         # EMA weight update
         self.ema.update(self.model)
 
-        # Log the clipped step norm when using automatic optimization
-        should_log_grad_norm = self.config.settings.debug.log_grad_norm
+        # Log the clipped step norm when not using per-sample gradient clipping
+        # In order to match the logging step of per-sample grad clipping,
+        # the step is shifted by 1
+        should_log_grad_norm = (
+            self.config.settings.debug.log_grad_norm and self.logger is not None
+        )
         if (
             not self.per_sample_grad_clipping
             and should_log_grad_norm
-            and self.logger is not None
             and self.trainer.global_step > 0
         ):
             global_norm, _ = compute_global_norm(parameters=self.model.parameters())
             self.logger.log_metrics(
                 {"extra_gradients/avg_clipped_grad_norm": global_norm.item()},
-                step=self.global_step - 1,  # Shifted wrt per-sample logging
+                step=self.global_step - 1,
             )
 
     def on_train_epoch_end(self):

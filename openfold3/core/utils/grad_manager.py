@@ -68,6 +68,13 @@ class PerSampleGradManager:
         accumulate_grad_batches: int = 1,
         log_grad_norm: bool = False,
     ):
+        """
+        Args:
+            gradient_clip_val (int | float | None): The value to clip the global norm of
+                per-sample gradients to
+            accumulate_grad_batches (int): Amount of gradient accumulation steps
+            log_grad_norm (bool): Whether to log gradient norm metrics
+        """
         self.max_grad_norm = gradient_clip_val
         self.accumulate_grad_batches = accumulate_grad_batches
         self.log_grad_norm = log_grad_norm
@@ -236,7 +243,7 @@ class PerSampleGradManager:
         self.accum_count += 1
 
     @torch.no_grad()
-    def sync_grads(self):
+    def sync_and_average_grads(self):
         """
         Prepares the gradients for the optimizer step.
         1. Copies the summed grads from the grad accumulator to

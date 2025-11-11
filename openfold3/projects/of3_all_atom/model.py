@@ -393,11 +393,12 @@ class OpenFold3(nn.Module):
         with torch.amp.autocast(device_type="cuda", dtype=cast_dtype):
             # Determine whether to use zij trunk embedding in confidence heads
             # Only enabled during training
-            use_zij_trunk_embedding = True
             if self.training:
                 use_zij_trunk_embedding = (
                     random.random() < self.shared.use_confidence_emb_prob
                 )
+            else:
+                use_zij_trunk_embedding = True
 
             # Compute confidence logits
             output.update(
