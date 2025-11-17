@@ -1390,16 +1390,10 @@ def create_main(
             filtered_msa = main_msa_redundant
             filtered_deletion = main_deletion_matrix_redundant
 
-        # Get indices for subsampled main MSA - should be seeded by the worker context
-        k = generator.integers(1, filtered_msa.shape[0] + 1)
-        idx = generator.choice(filtered_msa.shape[0], size=k, replace=False)
-        if keep_subsampled_order:
-            idx.sort()
-
         # Add to ID-MSA map
         rep_id_to_main_msa[rep_id] = MsaArray(
-            msa=filtered_msa[idx, :],
-            deletion_matrix=filtered_deletion[idx, :],
+            msa=filtered_msa,
+            deletion_matrix=filtered_deletion,
             metadata=pd.DataFrame(),
         )
 
@@ -1411,12 +1405,22 @@ def create_main(
         )
         rep_id_to_del_mean[rep_id] = np.mean(main_deletion_matrix_redundant, axis=0)
 
-    # Reindex dicts from representatives to chain IDs
+    # Reindex dicts from representatives to chain IDs and subsample main MSAs
     chain_id_to_main_msa = {}
     chain_id_to_profile = {}
     chain_id_to_del_mean = {}
     for chain_id, rep_id in msa_array_collection.chain_id_to_rep_id.items():
-        chain_id_to_main_msa[chain_id] = rep_id_to_main_msa[rep_id]
+        # Get indices for subsampled main MSA - should be seeded by the worker context
+        filtered_msa_array = rep_id_to_main_msa[rep_id]
+        k = generator.integers(1, filtered_msa_array.msa.shape[0] + 1)
+        idx = generator.choice(filtered_msa_array.msa.shape[0], size=k, replace=False)
+        if keep_subsampled_order:
+            idx.sort()
+        chain_id_to_main_msa[chain_id] = MsaArray(
+            msa=filtered_msa_array.msa[idx, :],
+            deletion_matrix=filtered_msa_array.deletion_matrix[idx, :],
+            metadata=pd.DataFrame(),
+        )
         chain_id_to_profile[chain_id] = rep_id_to_profile[rep_id]
         chain_id_to_del_mean[chain_id] = rep_id_to_del_mean[rep_id]
 

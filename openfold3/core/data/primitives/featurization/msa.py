@@ -19,7 +19,10 @@ import dataclasses
 import numpy as np
 from biotite.structure import AtomArray
 
-from openfold3.core.data.primitives.featurization.structure import get_token_starts
+from openfold3.core.data.primitives.featurization.structure import (
+    extract_starts_entities,
+    get_token_starts,
+)
 from openfold3.core.data.primitives.quality_control.logging_utils import (
     log_runtime_memory,
 )
@@ -338,5 +341,13 @@ def create_msa_feature_precursor_of3(
             msa_profile=np.zeros([n_tokens, len(STANDARD_RESIDUES_WITH_GAP_1)]),
             deletion_mean=np.zeros(n_tokens),
         )
+
+    # Mask token positions that correspond to padding
+    token_starts_with_stop, _ = extract_starts_entities(atom_array)
+    token_mask = np.zeros(n_tokens)
+    token_mask[: len(token_starts_with_stop[:-1])] = 1
+    msa_feature_precursor.msa_mask = (
+        msa_feature_precursor.msa_mask * token_mask[np.newaxis, :]
+    )
 
     return msa_feature_precursor
