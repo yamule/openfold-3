@@ -82,14 +82,14 @@ class TemplatePairEmbedderAllAtom(nn.Module):
             * batch["template_pseudo_beta_mask"][..., None, :]
         )[..., None] * multichain_pair_mask
 
-        template_distogram = batch["template_distogram"] * multichain_pair_mask
+        template_distogram = batch["template_distogram"]
 
         backbone_frame_pair_mask = (
             batch["template_backbone_frame_mask"][..., None]
             * batch["template_backbone_frame_mask"][..., None, :]
         )[..., None] * multichain_pair_mask
 
-        template_unit_vector = batch["template_unit_vector"] * multichain_pair_mask
+        template_unit_vector = batch["template_unit_vector"]
         x, y, z = template_unit_vector.unbind(dim=-1)
 
         # [*, N_templ, N_token, N_token, 32]

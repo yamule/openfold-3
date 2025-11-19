@@ -195,6 +195,7 @@ def create_template_restype(
 def create_template_distogram(
     pseudo_beta_atom_coords: np.ndarray[float],
     pseudo_beta_mask: np.ndarray[float],
+    multichain_pair_mask: torch.Tensor,
     min_bin: float = 3.25,
     max_bin: float = 50.75,
     n_bins: int = 39,
@@ -209,6 +210,10 @@ def create_template_distogram(
         pseudo_beta_atom_coords (np.ndarray[float]):
             The coordinates of the pseudo beta atoms. Has shape
             [n_templates, n_tokens, 3].
+        pseudo_beta_mask (np.ndarray[float]):
+            Pseudo beta mask for tokens with an unresolved pseudo beta atom.
+        multichain_pair_mask (torch.Tensor):
+            Per-token-pair mask for inter-chain residue pair features.
         min_bin (float, optional):
             Bin lower bound. Defaults to 3.25.
         max_bin (float, optional):
@@ -247,12 +252,14 @@ def create_template_distogram(
     return (
         template_distogram
         * (pseudo_beta_mask[..., None] * pseudo_beta_mask[..., None, :])[..., None]
+        * multichain_pair_mask
     )
 
 
 def create_template_unit_vector(
     frame_atom_coords: np.ndarray[float],
     backbone_frame_mask: np.ndarray[float],
+    multichain_pair_mask: torch.Tensor,
 ) -> torch.Tensor:
     """Creates the unit vector template feature for OF3.
 
@@ -263,6 +270,8 @@ def create_template_unit_vector(
         backbone_frame_mask (np.ndarray[float]):
             The mask indicating for each token in each template if all backbone frame
             atoms are available. Has shape [n_templates, n_tokens].
+        multichain_pair_mask (torch.Tensor):
+            Per-token-pair mask for inter-chain residue pair features.
 
     Returns:
         torch.Tensor:
@@ -301,4 +310,4 @@ def create_template_unit_vector(
         masked_coord = (coord * backbone_frame_2d)[..., None]
         masked_unit_vector.append(masked_coord)
 
-    return torch.cat(masked_unit_vector, dim=-1)
+    return torch.cat(masked_unit_vector, dim=-1) * multichain_pair_mask
