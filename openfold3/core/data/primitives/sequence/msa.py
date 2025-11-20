@@ -794,7 +794,7 @@ def sort_msa_by_distance_to_query(msa_array: MsaArray) -> None:
     msa_array.deletion_matrix = msa_array.deletion_matrix[sorting_indices, :]
 
 
-def count_species_per_chain(
+def count_species_per_rep(
     msa_arrays_to_pair: dict[str, MsaArray],
 ) -> tuple[np.ndarray[np.int], list[str]]:
     """Counts the occurrences of sequences from species in each chain's UniProt MSA.
@@ -810,8 +810,8 @@ def count_species_per_chain(
             and the list species with at least one sequence among MSAs of all chains.
     """
     species = []
-    for chain_id in msa_arrays_to_pair:
-        species.extend(set(msa_arrays_to_pair[chain_id].metadata["species_id"]))
+    for rep_id in msa_arrays_to_pair:
+        species.extend(set(msa_arrays_to_pair[rep_id].metadata["species_id"]))
     species = np.array(sorted(set(species)))
     species_index = np.arange(len(species))
     species_index_map = {species[i]: i for i in species_index}
@@ -819,11 +819,11 @@ def count_species_per_chain(
     # Get lists of species per chain
     species_index_per_chain = [
         np.array(
-            msa_arrays_to_pair[chain_id]
+            msa_arrays_to_pair[rep_id]
             .metadata["species_id"]
             .apply(lambda x: species_index_map[x])
         )
-        for chain_id in msa_arrays_to_pair
+        for rep_id in msa_arrays_to_pair
     ]
 
     # Combine all lists into one array
@@ -1005,7 +1005,7 @@ def _num_encode_species(
     return row_to_species
 
 
-def map_to_paired_msa_per_chain(
+def map_to_paired_msa_per_rep(
     msa_array_collection: MsaArrayCollection,
     msa_arrays_to_pair: dict[str, MsaArray],
     paired_rows_index: np.ndarray[int],
@@ -1040,7 +1040,7 @@ def map_to_paired_msa_per_chain(
 
     # Map species indices back to MSA row indices
     # Pre-allocate MSA objects, including those without pairable MSAs
-    paired_msa_per_chain = {
+    paired_msa_per_rep = {
         rep_id: MsaArray(
             msa=np.full((paired_rows_index.shape[0], seq.shape[-1]), "-"),
             deletion_matrix=np.zeros(
@@ -1053,7 +1053,7 @@ def map_to_paired_msa_per_chain(
     }
 
     # For each chain, sort MSA rows by the paired species indices
-    for chain_idx, (chain_id, msa_array) in enumerate(msa_arrays_to_pair.items()):
+    for rep_idx, (rep_id, msa_array) in enumerate(msa_arrays_to_pair.items()):
         # Get the array of species for each aligned sequences to the query chain
         species_array = np.array(msa_array.metadata["species_id"].to_numpy())
 
@@ -1061,7 +1061,7 @@ def map_to_paired_msa_per_chain(
         row_to_species = _num_encode_species(species, species_array)
 
         # Get paired species ids for chain
-        paired_row_index_of_chain = paired_rows_index[:, chain_idx]
+        paired_row_index_of_chain = paired_rows_index[:, rep_idx]
 
         if mode == "deque":
             # Build a mapping from species index to deque of MSA row indices
@@ -1107,14 +1107,14 @@ def map_to_paired_msa_per_chain(
 
         valid_rows = msa_rows != -1
         # Update MSA and deletion matrix with paired data
-        paired_msa_per_chain[chain_id].msa[paired_row_index_of_chain != -1] = (
+        paired_msa_per_rep[rep_id].msa[paired_row_index_of_chain != -1] = (
             msa_array.msa[msa_rows[valid_rows]]
         )
-        paired_msa_per_chain[chain_id].deletion_matrix[
+        paired_msa_per_rep[rep_id].deletion_matrix[
             paired_row_index_of_chain != -1
         ] = msa_array.deletion_matrix[msa_rows[valid_rows]]
 
-    return paired_msa_per_chain
+    return paired_msa_per_rep
 
 
 def expand_paired_msas(msa_array_collection: MsaArrayCollection) -> dict[int, MsaArray]:
@@ -1180,9 +1180,9 @@ def create_paired(
         return {}
 
     # Process uniprot headers and sort by distance to query
-    for chain_id in msa_arrays_to_pair:
-        msa_arrays_to_pair[chain_id].metadata = process_msa_pairing_metadata(
-            msa_arrays_to_pair[chain_id].metadata
+    for rep_id in msa_arrays_to_pair:
+        msa_arrays_to_pair[rep_id].metadata = process_msa_pairing_metadata(
+            msa_arrays_to_pair[rep_id].metadata
         )
 
     if max_seq_per_species is not None:
@@ -1190,7 +1190,7 @@ def create_paired(
             msa_arrays_to_pair[rep_id] = cap_seqs_per_species(msa, max_seq_per_species)
 
     # Count species occurrences per chain
-    count_array, species = count_species_per_chain(msa_arrays_to_pair)
+    count_array, species = count_species_per_rep(msa_arrays_to_pair)
 
     # Get pairing masks
     pairing_masks = get_pairing_masks(count_array, pairing_mask_keys)
@@ -1210,7 +1210,7 @@ def create_paired(
         return {}
 
     # Map species indices back to MSA row indices
-    paired_msa_per_chain = map_to_paired_msa_per_chain(
+    paired_msa_per_rep = map_to_paired_msa_per_rep(
         msa_array_collection,
         msa_arrays_to_pair,
         paired_rows_index,
@@ -1218,7 +1218,7 @@ def create_paired(
     )
 
     # Expand paired MSAs across all chains
-    msa_array_collection.rep_id_to_paired_msa = paired_msa_per_chain
+    msa_array_collection.rep_id_to_paired_msa = paired_msa_per_rep
     chain_id_to_paired_msa = expand_paired_msas(msa_array_collection)
 
     # Update row counts
