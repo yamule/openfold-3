@@ -82,6 +82,10 @@ class PerSampleGradManager:
         self.grad_accumulator = {}
         self._params_to_update = {}
 
+        # Track the number of valid samples per parameter for handling
+        # of confidence heads
+        self.parameter_participation_counts = {}
+
         # Track the number of accumulated gradients
         self.accum_count = 0
 
@@ -173,31 +177,38 @@ class PerSampleGradManager:
         """
         Sums gradients across all ranks and averages by the
         total number of accumulated samples globally.
+
+        Uses per-parameter active counts to handle sparse grads correctly.
+        The confidence module does not get grads from distillation samples
+        and samples with resolution out of range, so their grads will be divided
+        by the active number of samples instead.
         """
-        # Get global sum of accumulated samples (still needed for grad division)
+        # Get effective batch size
         local_count = torch.tensor(
             self.accum_count, dtype=torch.float32, device=self.device
         )
-
-        local_count = self._trainer.strategy.reduce(
+        global_total_count = self._trainer.strategy.reduce(
             local_count, reduce_op=dist.ReduceOp.SUM
         )
+        global_total_count = global_total_count.item()
 
-        global_count = local_count.item()
+        self.log_unclipped_grad_metrics(global_count=global_total_count)
 
-        self.log_unclipped_grad_metrics(global_count=global_count)
-
-        # If no samples were processed (edge case)
-        if global_count == 0:
+        if global_total_count == 0:
             # Zero the grads, they might contain stale values from the accumulator
             for p in self._params_to_update.values():
                 if p.grad is not None:
                     p.grad.zero_()
             return
 
+        # Ensure deterministic order for the count vector alignment
+        param_names = sorted(self._params_to_update.keys())
+
         grads_to_bucket = []
         params_with_grad = []
-        for p in self._params_to_update.values():
+
+        for name in param_names:
+            p = self._params_to_update[name]
             if p.grad is None:
                 p.grad = torch.zeros_like(p)
             grads_to_bucket.append(p.grad)
@@ -206,40 +217,78 @@ class PerSampleGradManager:
         if not grads_to_bucket:
             return
 
+        # Per-parameter sample counts [N_params]
+        local_param_counts = [
+            self.parameter_participation_counts.get(name, 0) for name in param_names
+        ]
+        counts_tensor = torch.tensor(
+            local_param_counts, dtype=torch.float32, device=self.device
+        )
+
+        # Sum counts across ranks for each parameter
+        global_active_counts = self._trainer.strategy.reduce(
+            counts_tensor, reduce_op=dist.ReduceOp.SUM
+        )
+
+        # Sum grads across rank
         # Flatten all gradients into one large tensor and make sure fp32 is used
         flat_grad = _flatten_dense_tensors(grads_to_bucket).float()
-
-        # Sum grads across ranks
         flat_grad = self._trainer.strategy.reduce(
             flat_grad, reduce_op=dist.ReduceOp.SUM
         )
 
-        # Average by number of samples
-        flat_grad.div_(global_count)
+        summed_grads = _unflatten_dense_tensors(flat_grad, grads_to_bucket)
 
-        new_grads = _unflatten_dense_tensors(flat_grad, grads_to_bucket)
+        for i, (p, summed_grad) in enumerate(zip(params_with_grad, summed_grads)):
+            sample_count = global_active_counts[i]
 
-        for p, new_grad in zip(params_with_grad, new_grads):
-            p.grad.copy_(new_grad)
+            if sample_count > 0:
+                # Average by actual sample count for that parameter
+                p.grad.copy_(summed_grad / sample_count)
+            else:
+                # No samples used this parameter globally
+                p.grad.zero_()
 
     @torch.no_grad()
-    def clip_and_accumulate(self, logging_info: dict | None = None):
+    def clip_and_accumulate(
+        self,
+        logging_info: dict | None = None,
+        disabled_params: set | None = None,
+    ):
         """
         Clips the current per-sample gradient in self._model.parameters()
         and adds it to the internal gradient accumulator.
 
         This should be called after self.manual_backward(loss),
         inside of a self.trainer.model.no_sync() context.
+
+        Args:
+            logging_info:
+                Info for logging outliers.
+            disabled_params:
+                A set of parameter names for which a sample is not active.
+                If None, assumes all parameters are active.
         """
         # Clip the single-sample grads
         self._clip_grads(logging_info=logging_info)
 
-        # Manually accumulate clipped grads
+        if disabled_params is None:
+            disabled_params = set()
+
+        # Manually accumulate clipped grads and track param participation
         for name, param in self._params_to_update.items():
             if param.grad is not None:
                 self.grad_accumulator[name].add_(param.grad)
 
-        # Increment the counter
+                if name not in self.parameter_participation_counts:
+                    self.parameter_participation_counts[name] = 0
+
+                # Determine if this parameter was active for this sample
+                is_active = 1 if name not in disabled_params else 0
+                self.parameter_participation_counts[name] += is_active
+
+        # Increment the global counter (still used for logging)
+        # TODO: Get rid of this later
         self.accum_count += 1
 
     @torch.no_grad()
@@ -249,7 +298,7 @@ class PerSampleGradManager:
         1. Copies the summed grads from the grad accumulator to
            self._model.parameters().
         2. Syncs and averages grads across all ranks by the
-           total number of accumulated samples.
+           active number of accumulated samples per parameter.
 
         This should be called before opt.step().
         """
@@ -269,8 +318,9 @@ class PerSampleGradManager:
         for acc_grad in self.grad_accumulator.values():
             acc_grad.zero_()
 
-        # Reset the counter
+        # Reset the counters
         self.accum_count = 0
+        self.parameter_participation_counts = {}
 
         # Reset the metric
         if self.log_grad_norm:

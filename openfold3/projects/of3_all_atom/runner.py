@@ -109,6 +109,7 @@ class OpenFold3AllAtom(ModelRunner):
             self.grad_manager.setup(
                 model=self.model, trainer=self.trainer, logger=self.logger
             )
+            self._identify_confidence_params()
 
         # Keep grads enabled for confidence head parameters only
         if stage == "fit" and self.config.settings.train_confidence_only:
@@ -130,6 +131,28 @@ class OpenFold3AllAtom(ModelRunner):
         for layer in exempt_submodule:
             for param in layer.parameters():
                 param.requires_grad = True
+
+    def _identify_confidence_params(self):
+        """
+        Identifies which parameters belong to confidence heads.
+        """
+        confidence_modules_prefixes = [
+            "aux_heads.pairformer_embedding",
+            "aux_heads.pde",
+            "aux_heads.plddt",
+            "aux_heads.experimentally_resolved",
+            "aux_heads.pae",
+        ]
+
+        self.confidence_param_names = set()
+
+        for name, _ in self.model.named_parameters():
+            # Check if this param belongs to confidence module
+            is_confidence = any(
+                name.startswith(f"{prefix}.") for prefix in confidence_modules_prefixes
+            )
+            if is_confidence:
+                self.confidence_param_names.add(name)
 
     def reseed(self, seed):
         pl.seed_everything(seed)
@@ -332,6 +355,30 @@ class OpenFold3AllAtom(ModelRunner):
         is_last_step_of_cycle = (batch_idx + 1) % accum_steps == 0
         return is_last_step_of_cycle or self.trainer.is_last_batch
 
+    def _get_disabled_param_names(self, loss_weights: dict) -> set | None:
+        """
+        Returns a list of confidence head parameters that should be disabled
+        when counting grads across ranks, else None.
+        """
+        confidence_loss_name = (
+            self.config.architecture.loss_module.confidence_loss_names
+        )
+
+        total_conf_weight = sum(
+            loss_weights[name].item() for name in confidence_loss_name
+        )
+
+        is_valid_confidence_sample = total_conf_weight > 0
+
+        # Confidence losses valid are not valid for distillation samples or
+        # samples with resolution out-of-bounds
+        if not is_valid_confidence_sample:
+            # Return the pre-computed list of confidence param names
+            return self.confidence_param_names
+
+        # If no params are disabled, return None
+        return None
+
     def _training_step_manual_clip(self, batch, batch_idx):
         assert len(batch["pdb_id"]) == 1, (
             "Currently only local batch size of 1 per GPU is supported."
@@ -390,7 +437,13 @@ class OpenFold3AllAtom(ModelRunner):
                 loss, loss_breakdown = self.loss(batch, outputs, _return_breakdown=True)
 
                 self.manual_backward(loss)
-                self.grad_manager.clip_and_accumulate(logging_info=logging_info)
+
+                disabled_params = self._get_disabled_param_names(
+                    loss_weights=batch["loss_weights"]
+                )
+                self.grad_manager.clip_and_accumulate(
+                    logging_info=logging_info, disabled_params=disabled_params
+                )
 
             if self._is_opt_step_ready(batch_idx):
                 # Average and sync grads
