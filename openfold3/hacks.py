@@ -2,15 +2,18 @@ import importlib
 import os
 from pathlib import Path
 
+PLACEHOLDER_PATH = "placeholder"
+
 
 def prep_deepspeed():
     # deepspeed requires the envvar set, but doesn't care about value
-    os.environ["CUTLASS_PATH"] = os.environ.get("CUTLASS_PATH", "placeholder")
+    if not os.environ["CUTLASS_PATH"]:
+        os.environ["CUTLASS_PATH"] = os.environ.get("CUTLASS_PATH", PLACEHOLDER_PATH)
 
 
 def prep_cutlass():
     cutlass_lib_is_installed = importlib.util.find_spec("cutlass_library") is not None
-    cutlass_path = Path(os.environ.get("CUTLASS_PATH", "placeholder"))
+    cutlass_path = Path(os.environ.get("CUTLASS_PATH", PLACEHOLDER_PATH))
 
     # TODO: This check is for backward compatibility with the old local cutlass setup.
     #  Remove this and use pip installation only in the future.
