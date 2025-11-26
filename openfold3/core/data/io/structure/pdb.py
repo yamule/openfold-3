@@ -112,7 +112,8 @@ def parse_protein_monomer_pdb_tmp(
     atom_array = remove_hydrogens(atom_array)
     atom_array = remove_std_residue_terminal_atoms(atom_array)
 
-    return ParsedStructure(cif_file, atom_array)
+    return ParsedStructure(pdb_file, atom_array)
+
 
 # TODO: refactor with PDB reader below as it currently only supports monomers
 def parse_RNA_monomer_pdb_tmp(
