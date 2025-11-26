@@ -122,7 +122,7 @@ def parse_RNA_monomer_pdb_tmp(
     extra_fields: list | None = None,
     s3_profile: str | None = None,
 ):
-    """Temporary function to parse a protein monomer from a PDB file.
+    """Temporary function to parse a RNA monomer from a cif file.
 
     Args:
         file_path (Path | str): _description_
@@ -157,8 +157,7 @@ def parse_RNA_monomer_pdb_tmp(
     atom_array = pdbx.get_structure(
         **parser_args,
     )
-    # print(type(atom_array))
-    # print('----')
+
     ## manually assign th entity and molecule type ids;
     ## monomers are all "single chain", so should have the same entity id,
     ## everything is a single asym, and sym id should be 1(identity)
