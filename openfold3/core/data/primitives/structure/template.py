@@ -525,12 +525,16 @@ def map_token_pos_to_template_residues(
         )
         atom_array_cropped_template = atom_array_cropped_template[mask_singleocc]
 
+    # Skip if still misaligned
+    if residue_starts.shape != repeats.shape:
+        template_slice = None
     # Add token position annotation to template atom array mapping to the crop
-    template_slice = TemplateSlice(
-        atom_array=atom_array_cropped_template,
-        query_token_positions=query_token_atoms_aligned_cropped.token_position,
-        template_residue_repeats=repeats,
-    )
+    else:
+        template_slice = TemplateSlice(
+            atom_array=atom_array_cropped_template,
+            query_token_positions=query_token_atoms_aligned_cropped.token_position,
+            template_residue_repeats=repeats,
+        )
 
     # Add to list of cropped + aligned template atom arrays for this chain
     if template_slice is not None:
