@@ -217,11 +217,13 @@ class ProteinMonomerConfig(DefaultDatasetConfigSection):
 class RNAMonomerConfig(DefaultDatasetConfigSection):
     sample_in_order: bool = False
     crop: CropSettings = CropSettings(
-        crop_weights={
-            "contiguous": 0.25,
-            "spatial": 0.75,
-            "spatial_interface": 0.0,
-        }
+        token_crop=TokenCropSettings(
+            crop_weights=CropWeights(
+                contiguous=0.25,
+                spatial=0.75,
+                spatial_interface=0.0,
+            )
+        )
     )
     loss: LossConfig = LossConfig(
         loss_weights={
