@@ -751,8 +751,11 @@ def dockq(
 
             lrmsd_score = torch.sqrt(
                 torch.mean(
-                    (gt_coords_lig_bb - pred_coords_lig_bb_transformed) ** 2,
-                    dim=(-2, -1),
+                    torch.sum(
+                        (gt_coords_lig_bb - pred_coords_lig_bb_transformed) ** 2,
+                        dim=-1,
+                    ),
+                    dim=-1,
                 )
             )
 
@@ -806,7 +809,10 @@ def dockq(
 
             irmsd_score = torch.sqrt(
                 torch.mean(
-                    (gt_coords_if_bb - pred_coords_if_bb_transformed) ** 2, dim=(-2, -1)
+                    torch.sum(
+                        (gt_coords_if_bb - pred_coords_if_bb_transformed) ** 2, dim=-1
+                    ),
+                    dim=-1,
                 )
             )
 

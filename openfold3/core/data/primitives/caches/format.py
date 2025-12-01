@@ -777,6 +777,14 @@ class ProteinMonomerChainData:
     index: int
 
 
+@dataclass
+class RNAMonomerChainData:
+    """Chain-wise data for protein monomers."""
+
+    alignment_representative_id: str | None
+    index: int
+
+
 # --- Interface data dataclasses ---
 @dataclass
 class ClusteredDatasetInterfaceData:
@@ -845,6 +853,13 @@ class ProteinMonomerStructureData:
     chains: dict[str, ProteinMonomerChainData]
 
 
+@dataclass
+class RNAMonomerStructureData:
+    """Structure data for protein monomers."""
+
+    chains: dict[str, RNAMonomerChainData]
+
+
 ClusteredDatasetStructureDataCache: TypeAlias = DictOrLMDBDict[
     str, ClusteredDatasetStructureData
 ]
@@ -854,6 +869,7 @@ ValClusteredDatasetStructureDataCache: TypeAlias = DictOrLMDBDict[
 ProteinMonomerStructureDataCache: TypeAlias = DictOrLMDBDict[
     str, ProteinMonomerStructureData
 ]
+RNAMonomerStructureDataCache: TypeAlias = DictOrLMDBDict[str, RNAMonomerStructureData]
 
 
 # --- Reference molecule dataclasses ---
@@ -943,14 +959,52 @@ class ProteinMonomerDatasetCache(DatasetCache):
         return structure_data
 
 
+@register_datacache
+@dataclass
+class RNAMonomerDatasetCache(DatasetCache):
+    """Full data cache for protein monomer data from AF2."""
+
+    name: str
+    structure_data: RNAMonomerStructureDataCache
+    reference_molecule_data: DatasetReferenceMoleculeCache
+    _chain_data_format = RNAMonomerChainData
+    _ref_mol_data_format = DatasetReferenceMoleculeData
+    _structure_data_format = RNAMonomerStructureData
+
+    @classmethod
+    def _parse_structure_data_json(cls, data: dict) -> dict:
+        # Format structure data
+        structure_data = {}
+        for pdb_id, per_structure_data in data["structure_data"].items():
+            chain_data = per_structure_data.pop("chains")
+
+            # Extract all chain data into respective chain data format
+            chains = {
+                chain_id: cls._chain_data_format(**chain_data[chain_id])
+                for chain_id in chain_data
+            }
+
+            # Combine chain and interface data with remaining structure data
+            structure_data[pdb_id] = cls._structure_data_format(
+                chains=chains, **per_structure_data
+            )
+        return structure_data
+
+
 # Grouped type-aliases for more convenient type-hinting of general-purpose functions
-ChainData: TypeAlias = PreprocessingChainData | PDBChainData | ProteinMonomerChainData
+ChainData: TypeAlias = (
+    PreprocessingChainData
+    | PDBChainData
+    | ProteinMonomerChainData
+    | RNAMonomerChainData
+)
 StructureDataCache: TypeAlias = (
     PreprocessingStructureDataCache
     | DisorderedPreprocessingStructureDataCache
     | ClusteredDatasetStructureDataCache
     | ValClusteredDatasetStructureDataCache
     | ProteinMonomerStructureDataCache
+    | RNAMonomerStructureDataCache
 )
 ReferenceMoleculeCache: TypeAlias = (
     PreprocessingReferenceMoleculeCache | DatasetReferenceMoleculeCache

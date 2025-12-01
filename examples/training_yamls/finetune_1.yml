@@ -65,6 +65,8 @@ dataset_configs:
             contiguous: 0.2
             spatial: 0.4
             spatial_interface: 0.4
+          chain_crop:
+            enabled: true
         loss:
           loss_weights:
             bond: 4.0
@@ -135,6 +137,8 @@ dataset_configs:
             contiguous: 0.2
             spatial: 0.4
             spatial_interface: 0.4
+          chain_crop:
+            enabled: true
         loss:
           loss_weights:
             bond: 4.0

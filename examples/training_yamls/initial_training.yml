@@ -55,6 +55,8 @@ dataset_configs:
             contiguous: 0.2
             spatial: 0.4
             spatial_interface: 0.4
+          chain_crop:
+            enabled: true
 
     long-monomer-distillation:
       dataset_class: ProteinMonomerDataset
@@ -115,6 +117,8 @@ dataset_configs:
             contiguous: 0.2
             spatial: 0.4
             spatial_interface: 0.4
+          chain_crop:
+            enabled: true
         loss:
           loss_weights:
             experimentally_resolved: 0.0

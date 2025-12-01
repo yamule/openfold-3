@@ -20,13 +20,13 @@ jobs:
       instances: ${{ steps.aws-start.outputs.instances }}
     steps:
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: arn:aws:iam::203627415330:role/of-gha-runner 
           aws-region: us-east-1
       - name: Create cloud runner
         id: aws-start
-        uses: omsf/start-aws-gha-runner@v1.0.0
+        uses: omsf/start-aws-gha-runner@v1.1.0
         with:
           aws_image_id: ami-0754c6e75b3b97dcd  # Deep Learning AMI Neuron (Ubuntu 22.04)
           aws_instance_type: trn1.2xlarge 
@@ -71,7 +71,7 @@ jobs:
     if: ${{ always() }}
     steps:
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: arn:aws:iam::203627415330:role/of-gha-runner 
           aws-region: us-east-1

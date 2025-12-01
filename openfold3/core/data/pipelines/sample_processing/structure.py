@@ -18,6 +18,7 @@ import logging
 from pathlib import Path
 from typing import Literal, NamedTuple
 
+import numpy as np
 from biotite.structure import AtomArray
 
 from openfold3.core.data.io.structure.cif import parse_target_structure
@@ -31,7 +32,9 @@ from openfold3.core.data.primitives.quality_control.logging_utils import (
 from openfold3.core.data.primitives.structure.component import (
     assign_component_ids_from_metadata,
 )
-from openfold3.core.data.primitives.structure.cropping import sample_crop_and_set_mask
+from openfold3.core.data.primitives.structure.cropping import (
+    crop_chainwise_and_set_crop_mask,
+)
 from openfold3.core.data.primitives.structure.labels import (
     assign_uniquified_atom_names,
 )
@@ -103,32 +106,30 @@ def process_target_structure_of3(
     # Tokenize
     tokenize_atom_array(atom_array=atom_array)
 
-    # Set the crop_mask attribute of the atom_array, marking which atoms are in the crop
-    # and which aren't, and get the crop strategy that was used
-    crop_strategy = sample_crop_and_set_mask(
+    # Apply optional pre-cropping and main cropping (setting crop_mask attribute)
+    atom_array, crop_strategy = crop_chainwise_and_set_crop_mask(
         atom_array=atom_array,
         apply_crop=apply_crop,
         crop_config=crop_config,
         preferred_chain_or_interface=preferred_chain_or_interface,
     )
 
+    # The number of tokens is used in downstream parts of the data pipeline
+    # if cropping was done, we want to set the number of tokens to the token budget
+    if apply_crop:
+        n_tokens = crop_config["token_budget"]
+    else:
+        n_tokens = np.unique(atom_array.token_id).shape[0]
+
     # Add labels to identify symmetric mols in permutation alignment
     atom_array = assign_mol_permutation_ids(atom_array, retokenize=True)
 
     # NOTE: could move this to conformer processing
     # TODO: make this logic more robust (potentially by reverting treating multi-residue
-    # ligands as single compnents)
+    # ligands as single components)
     # Necessary for multi-residue ligands (which can have duplicated atom names) to
     # identify which atom names ended up in the crop.
     atom_array = assign_uniquified_atom_names(atom_array)
-
-    # The number of tokens is used in downstream parts of the data pipeline
-    # if cropping was done, we want to set the number of tokens to the token budget
-    if apply_crop:
-        n_tokens = crop_config["token_budget"]
-    # otherwise set it to the number of tokens in the target structure
-    else:
-        n_tokens = len(set(atom_array.token_id))
 
     return ProcessedTargetStructure(
         atom_array_gt=atom_array,

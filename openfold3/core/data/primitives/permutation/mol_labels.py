@@ -603,11 +603,12 @@ def assign_mol_permutation_ids(
 ) -> AtomArray:
     """Assigns all permutation-related annotations to the atom array.
 
-    This function detects symmetry-equivalent covalently connected components (=
-    molecules) in the atom array and assigns symmetry-related annotations, required for
-    the permutation alignment. Additionally it reorders the chains within
-    symmetry-equivalent molecules to a consistent order if necessary, so that their
-    features match each other.
+    This function detects symmetry-equivalent covalently connected "molecules" (usually
+    consisting of one or multiple chains) in the atom array and assigns symmetry-related
+    annotations, required for the permutation alignment. Additionally it reorders the
+    chains within symmetry-equivalent molecules to a consistent order if necessary, for
+    example in the case of protein chains bound to multiple covalent ligands, so that
+    their features match each other.
 
     Args:
         atom_array (AtomArray):

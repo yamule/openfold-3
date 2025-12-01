@@ -205,6 +205,31 @@ class ProteinMonomerConfig(DefaultDatasetConfigSection):
     )
 
 
+@register_dataset_config("RNAMonomerDataset")
+class RNAMonomerConfig(DefaultDatasetConfigSection):
+    sample_in_order: bool = False
+    crop: CropSettings = CropSettings(
+        crop_weights={
+            "contiguous": 0.25,
+            "spatial": 0.75,
+            "spatial_interface": 0.0,
+        }
+    )
+    loss: LossConfig = LossConfig(
+        loss_weights={
+            "bond": 0.0,
+            "smooth_lddt": 4.0,
+            "mse": 4.0,
+            "distogram": 3e-2,
+            # These losses are zero for the protein_monomer_distillation set
+            "experimentally_resolved": 0.0,
+            "plddt": 0.0,
+            "pae": 0.0,
+            "pde": 0.0,
+        }
+    )
+
+
 @register_dataset_config("DisorderedPDBDataset")
 class DisorderedPDBConfig(DefaultDatasetConfigSection):
     sample_weights: dict = {

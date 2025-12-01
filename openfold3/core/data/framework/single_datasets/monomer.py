@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# %%
 import logging
 import random
 import traceback
@@ -34,9 +33,11 @@ logger = logging.getLogger(__name__)
 
 
 @register_dataset
-class ProteinMonomerDataset(BaseOF3Dataset):
+class MonomerDataset(BaseOF3Dataset):
     def __init__(self, dataset_config: dict) -> None:
-        """Initializes a ProteinMonomerDataset.
+        """Initializes a MonomerDataset.
+
+        Should be used as a base class for single-molecule-type monomer datasets.
 
         Args:
             dataset_config (dict):
@@ -51,9 +52,6 @@ class ProteinMonomerDataset(BaseOF3Dataset):
         # Dataset configuration
         self.apply_crop = True
         self.crop = dataset_config.crop.model_dump()
-
-        # All samples are protein
-        self.single_moltype = "PROTEIN"
 
     def create_datapoint_cache(self):
         """Creates the datapoint_cache for uniform sampling.
@@ -131,10 +129,41 @@ class ProteinMonomerDataset(BaseOF3Dataset):
                 logger.warning(
                     "-" * 40
                     + "\n"
-                    + f"Failed to process ProteinMonomerDataset entry {pdb_id}:"
-                    + f" {str(e)}\n"
+                    + f"Failed to process {self.single_moltype}MonomerDataset entry "
+                    + f"{pdb_id}: {str(e)}\n"
                     + f"Exception type: {type(e).__name__}\nTraceback: {tb}"
                     + "-" * 40
                 )
                 index = random.randint(0, len(self) - 1)
                 return self.__getitem__(index)
+
+
+@register_dataset
+class ProteinMonomerDataset(MonomerDataset):
+    def __init__(self, dataset_config: dict) -> None:
+        """Initializes a ProteinMonomerDataset.
+
+        Args:
+            dataset_config (dict):
+                Input config. See openfold3/examples/pdb_sample_dataset_config.yml for
+                an example.
+        """
+        super().__init__(dataset_config)
+        # All samples are protein
+        self.single_moltype = "PROTEIN"
+
+
+@register_dataset
+class RNAMonomerDataset(MonomerDataset):
+    def __init__(self, dataset_config: dict) -> None:
+        """Initializes a RNAMonomerDataset.
+
+        Args:
+            dataset_config (dict):
+                Input config. See openfold3/examples/pdb_sample_dataset_config.yml for
+                an example.
+        """
+        super().__init__(dataset_config)
+
+        # All samples are RNA
+        self.single_moltype = "RNA"

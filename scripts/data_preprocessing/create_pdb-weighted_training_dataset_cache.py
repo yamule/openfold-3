@@ -91,7 +91,7 @@ from openfold3.core.data.pipelines.preprocessing.caches.pdb_weighted import (
     ),
 )
 @click.option(
-    "--missing_alignment_log",
+    "--missing-alignment-log",
     type=click.Path(exists=False, file_okay=True, dir_okay=False, path_type=Path),
     default=None,
     help=(
