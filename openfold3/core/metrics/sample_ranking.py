@@ -28,7 +28,7 @@ def full_complex_sample_ranking_metric(
     ptm_weight: float = 0.2,
     iptm_weight: float = 0.8,
     disorder_weight: float = 0.5,
-    has_clash_weight: float = -100.0,
+    has_clash_weight: float = 100.0,
     disorder_threshold: float = 0.581,
     **ptm_bin_kwargs,
 ) -> torch.Tensor:

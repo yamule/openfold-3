@@ -534,7 +534,7 @@ model_config = mlc.ConfigDict(
                     "ptm_weight": 0.2,
                     "iptm_weight": 0.8,
                     "disorder_weight": 0.5,
-                    "has_clash_weight": -100.0,
+                    "has_clash_weight": 100.0,
                     "disorder_threshold": 0.581,
                 },
                 "chain_pair_iptm": {"enabled": True},
