@@ -360,22 +360,21 @@ def parse_msas_preparsed(
 
     for aln_file in file_list:
         # Parse npz file
-        pre_parsed_msas = np.load(aln_file, allow_pickle=True)
-
-        # Unpack the pre-parsed MSA arrays into a dict of MsaArrays
-        for k in list(pre_parsed_msas.keys()):
-            unpacked_msas = pre_parsed_msas[k].item()
-            if k in msas:
-                warnings.warn(
-                    f"Found duplicate key {k} in {aln_file}. Only the last MSA will "
-                    "be kept.",
-                    stacklevel=2,
+        with np.load(aln_file, allow_pickle=True) as pre_parsed_msas:
+            # Unpack the pre-parsed MSA arrays into a dict of MsaArrays
+            for k in list(pre_parsed_msas.keys()):
+                unpacked_msas = pre_parsed_msas[k].item()
+                if k in msas:
+                    warnings.warn(
+                        f"Found duplicate key {k} in {aln_file}. Only the last "
+                        "MSA will be kept.",
+                        stacklevel=2,
+                    )
+                msas[k] = MsaArray(
+                    msa=unpacked_msas["msa"],
+                    deletion_matrix=unpacked_msas["deletion_matrix"],
+                    metadata=unpacked_msas["metadata"],
                 )
-            msas[k] = MsaArray(
-                msa=unpacked_msas["msa"],
-                deletion_matrix=unpacked_msas["deletion_matrix"],
-                metadata=unpacked_msas["metadata"],
-            )
 
     return msas
 

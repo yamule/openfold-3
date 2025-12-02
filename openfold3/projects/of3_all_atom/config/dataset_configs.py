@@ -215,7 +215,6 @@ class ProteinMonomerConfig(DefaultDatasetConfigSection):
 
 @register_dataset_config("RNAMonomerDataset")
 class RNAMonomerConfig(DefaultDatasetConfigSection):
-    sample_in_order: bool = False
     crop: CropSettings = CropSettings(
         token_crop=TokenCropSettings(
             crop_weights=CropWeights(
@@ -271,6 +270,7 @@ class DisorderedPDBConfig(DefaultDatasetConfigSection):
 @register_dataset_config("ValidationPDBDataset")
 class ValidationPDBConfig(DefaultDatasetConfigSection):
     crop: CropSettings = CropSettings(token_crop=TokenCropSettings(enabled=False))
+    msa: MSASettings = MSASettings(subsample_main=False)
     template: TemplateSettings = TemplateSettings(take_top_k=True)
 
 
@@ -309,7 +309,7 @@ class InferenceDatasetConfigKwargs(BaseModel):
     """Class to hold msa and template kwargs for inference pipeline"""
 
     ccd_file_path: FilePathOrNone = None
-    msa: MSASettings = MSASettings()
+    msa: MSASettings = MSASettings(subsample_main=False)
     template: TemplateSettings = TemplateSettings(take_top_k=True)
 
 

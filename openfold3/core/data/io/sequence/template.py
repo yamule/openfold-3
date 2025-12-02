@@ -78,8 +78,6 @@ class TemplateHit(NamedTuple):
             Number of
         hit_sequence (str):
             The PDB ID of the hit.
-        indices_hit (str):
-            The PDB ID of the hit.
         e_value (str):
             The PDB ID of the hit.
     """
@@ -88,7 +86,6 @@ class TemplateHit(NamedTuple):
     name: str
     aligned_cols: int
     hit_sequence: str
-    indices_hit: list[int]
     e_value: float | None
 
 
@@ -267,7 +264,7 @@ def convert_stockholm_to_a3m(
         query_non_gaps = [res != "-" for res in query_sequence]
     for seqname, sto_sequence in sequences.items():
         # Dots are optional in a3m format and are commonly removed.
-        out_sequence = sto_sequence.replace(".", "")
+        out_sequence = sto_sequence.replace(".", "-")
         if remove_first_row_gaps:
             out_sequence = "".join(
                 _convert_sto_seq_to_a3m(query_non_gaps, out_sequence)
@@ -309,7 +306,6 @@ def parse_hmmsearch_a3m(a3m_string: str) -> dict[int, TemplateHit]:
 
         # Aligned columns are only the match states
         aligned_cols = sum([r.isupper() and r != "-" for r in hit_sequence])
-        indices_hit = _get_indices(hit_sequence, start=metadata.start)
 
         # Embed in TempateHit dataclass
         hits[i] = TemplateHit(
@@ -318,7 +314,6 @@ def parse_hmmsearch_a3m(a3m_string: str) -> dict[int, TemplateHit]:
             aligned_cols=aligned_cols,
             e_value=0,
             hit_sequence=hit_sequence.upper(),
-            indices_hit=indices_hit,
         )
 
     return hits

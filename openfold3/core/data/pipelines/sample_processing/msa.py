@@ -238,6 +238,7 @@ def create_main(
     chain_id_to_paired_msa: dict[str, MsaArray],
     max_rows: int,
     aln_order: list[str],
+    subsample_main: bool,
     keep_subsampled_order: bool,
 ) -> dict[str, MsaArray]:
     """Creates main MSA arrays from non-UniProt MSAs.
@@ -253,6 +254,8 @@ def create_main(
             Dict of paired Msa objects per chain.
         max_rows (int):
             Maximum number of sequence rows allowed for the MSA vstack of each chain.
+        subsample_main (bool):
+            Whether to apply per-chain main MSA subsampling.
         aln_order (list[str]):
             The order in which to concatenate the main MSA arrays vertically. Alignments
             not in this list are not added to the main MSA.
@@ -332,21 +335,28 @@ def create_main(
     n_rows_paired_subsampled = msa_array_collection.row_counts.n_rows_paired_subsampled
     n_rows_main_subsampled = {}
     max_n_rows_main_subsampled = 0
+    # row upper limit for main MSAs
+    n_rows_main_msa_lim = max(0, max_rows - n_rows_paired_subsampled - 1)
     for chain_id, rep_id in msa_array_collection.chain_id_to_rep_id.items():
         filtered_msa_array = rep_id_to_main_msa[rep_id]
         # actual number of rows in the unsubsampled main MSA for this chain
         n_rows_main_msa = filtered_msa_array.msa.shape[0]
-        # row upper limit for this main MSA
-        n_rows_main_msa_lim = max(0, max_rows - n_rows_paired_subsampled - 1)
-        # No main MSA or limit exhausted
-        if n_rows_main_msa == 0 or n_rows_main_msa_lim == 0:
-            idx = np.empty((0,), dtype=int)
-        # Subsample otherwise
+
+        if subsample_main:
+            # No main MSA or limit exhausted
+            if n_rows_main_msa == 0 or n_rows_main_msa_lim == 0:
+                idx = np.empty((0,), dtype=int)
+            # Subsample otherwise
+            else:
+                k = np.random.randint(1, min(n_rows_main_msa, n_rows_main_msa_lim) + 1)
+                idx = np.random.choice(n_rows_main_msa, size=k, replace=False)
+
+            if keep_subsampled_order:
+                idx.sort()
         else:
-            k = np.random.randint(1, min(n_rows_main_msa, n_rows_main_msa_lim) + 1)
-            idx = np.random.choice(n_rows_main_msa, size=k, replace=False)
-        if keep_subsampled_order:
-            idx.sort()
+            # Keep up to the limit
+            idx = np.arange(min(n_rows_main_msa, n_rows_main_msa_lim))
+
         main_msa = MsaArray(
             msa=filtered_msa_array.msa[idx, :],
             deletion_matrix=filtered_msa_array.deletion_matrix[idx, :],
@@ -389,6 +399,7 @@ class MsaSampleProcessor:
             create_main,
             max_rows=config.max_rows,
             aln_order=config.aln_order,
+            subsample_main=config.subsample_main,
             keep_subsampled_order=config.keep_subsampled_order,
         )
 

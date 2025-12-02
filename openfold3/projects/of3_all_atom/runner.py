@@ -65,7 +65,9 @@ logger = logging.getLogger(__name__)
 # Only metrics with values present are logged, so we can ignore this error
 warnings.filterwarnings(
     "ignore",
-    message=r"The `compute` method of metric .* was called before the `update` method",
+    message=(
+        r"The ``compute`` method of metric .* was called before the ``update`` method"
+    ),
     category=UserWarning,
     module="torchmetrics",
 )

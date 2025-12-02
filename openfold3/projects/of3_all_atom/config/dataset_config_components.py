@@ -105,6 +105,7 @@ class MSASettings(BaseModel):
         "colabfold_main",
         "dummy",  # aln containing only query; used for MSA-free inference
     ]
+    subsample_main: bool = True
     keep_subsampled_order: bool = False
     paired_msa_order: list = ["colabfold_paired"]
 
@@ -120,6 +121,7 @@ class TemplateSettings(BaseModel):
 
     n_templates: int = 4
     take_top_k: bool = False
+    min_n_tokens_per_chain: int = 5
     distogram: TemplateDistogramSettings = TemplateDistogramSettings()
 
 

@@ -40,33 +40,9 @@ from openfold3.core.data.resources.residues import (
 logger = logging.getLogger(__name__)
 
 
-TOKEN_DIM_INDEX_MAP = {
-    "residue_index": [-1],
-    "token_index": [-1],
-    "asym_id": [-1],
-    "entity_id": [-1],
-    "sym_id": [-1],
-    "restype": [-2],
-    "is_protein": [-1],
-    "is_rna": [-1],
-    "is_dna": [-1],
-    "is_ligand": [-1],
-    "token_bonds": [-1, -2],
-    "num_atoms_per_token": [-1],
-    "is_atomized": [-1],
-    "start_atom_index": [-1],
-    "token_mask": [-1],
-    "mol_entity_id": [-1],
-    "mol_sym_id": [-1],
-    "mol_sym_token_index": [-1],
-    "mol_sym_component_id": [-1],
-}
-
-
 def featurize_structure_of3(
     atom_array: AtomArray,
     n_tokens: int,
-    token_dim_index_map: dict[str, int],
     is_gt: bool,
     add_perm_features: bool = True,
 ) -> dict[str, torch.Tensor]:
@@ -80,8 +56,6 @@ def featurize_structure_of3(
             AtomArray of the target or ground truth structure.
         n_tokens (int):
             Number of tokens in the target structure.
-        token_dim_index_map (dict[str, int]):
-            Mapping of feature names to the index of the token dimension.
         is_gt (bool):
             Whether the input AtomArray is from the duplicate-expanded ground truth
             structure.
@@ -230,7 +204,7 @@ def featurize_structure_of3(
         )
 
     # Pad and return
-    return pad_token_dim(features, n_tokens, token_dim_index_map=token_dim_index_map)
+    return pad_token_dim(features, n_tokens)
 
 
 @log_runtime_memory(runtime_dict_key="runtime-target-structure-feat")
@@ -258,12 +232,9 @@ def featurize_target_gt_structure_of3(
             Target and ground truth features. Ground truth features are nested
             in a subdictionary under the 'ground_truth' key.
     """
-    # TODO: Can probably get rid of TOKEN_DIM_INDEX_MAP because padding is already
-    # handled in the BatchCollator
     features_target = featurize_structure_of3(
         atom_array=atom_array,
         n_tokens=n_tokens,
-        token_dim_index_map=TOKEN_DIM_INDEX_MAP,
         is_gt=False,
     )
 
@@ -271,7 +242,6 @@ def featurize_target_gt_structure_of3(
     features_gt = featurize_structure_of3(
         atom_array=atom_array_gt,
         n_tokens=len(np.unique(atom_array_gt.token_id)),
-        token_dim_index_map=TOKEN_DIM_INDEX_MAP,
         is_gt=True,
     )
     features_target["ground_truth"] = features_gt
