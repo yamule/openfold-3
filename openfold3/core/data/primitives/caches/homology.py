@@ -167,7 +167,9 @@ def run_mmseqs_search(
         target_id_to_sequence (Dict[str, str]):
             Mapping of target sequence IDs to sequences.
         min_sequence_identity (float):
-            Minimum sequence identity for a hit to be considered homologous.
+            Minimum sequence identity for a hit to be considered homologous. Note that
+            this refers to the global sequence identity with respect to the full length
+            of the query sequence.
         sensitivity (float):
             Sensitivity of the search.
         mmseqs_binary (str):
@@ -214,11 +216,12 @@ def run_mmseqs_search(
             search_type = 0  # auto
 
         # Run MMseqs2 search with high sensitivity and ensuring that all target
-        # sequences can be included in the hits
+        # sequences can be included in the hits. Also prefilter by coverage wrt the
+        # query sequence as that is guaranteed to be >= query sequence identity.
         cmd_search = (
             f"{mmseqs_binary} search {db_query} {db_target} {db_result} "
             f"{temp_dir}/tmp -s {sensitivity} --max-seqs {len(target_id_to_sequence)} "
-            f"--search-type {search_type}"
+            f"--search-type {search_type} -c {min_sequence_identity} --cov-mode 2"
         )
         logger.info("Running MMseqs2 search.")
         sp.run(cmd_search, shell=True, check=True)
@@ -229,19 +232,29 @@ def run_mmseqs_search(
             f"{db_query} "
             f"{db_target} "
             f"{db_result} "
-            f"{result_tsv}"
+            f"{result_tsv} "
+            "--format-output 'query,target,pident,qcov'"
         )
         logger.info("Converting MMseqs2 search results to TSV.")
         sp.run(cmd_convert, shell=True, check=True)
 
         # Parse the search results
         logger.info("Parsing MMseqs2 search results.")
-        df = pd.read_csv(result_tsv, sep="\t", header=None, usecols=[0, 1, 2])
+        df = pd.read_csv(result_tsv, sep="\t", header=None)
+
+        if df.empty:
+            logger.warning("MMseqs2 search returned no hits.")
+            return {}
+
         assert df[2].min() >= 0.0 and df[2].max() <= 1.0
 
         logger.info("Filtering templates.")
         query_seq_id_to_homologs = {}
-        high_identity = df[df[2] > min_sequence_identity]
+
+        # Global query sequence identity = pident x qcov
+        query_sequence_identity = df[2] * df[3]
+
+        high_identity = df[query_sequence_identity > min_sequence_identity]
 
         # Group by column 0 (query ID), then collect sets of column 1 (homolog IDs)
         grouped = high_identity.groupby(0)[1].apply(set)
