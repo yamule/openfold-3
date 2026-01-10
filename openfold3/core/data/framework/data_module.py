@@ -428,7 +428,7 @@ class DataModule(pl.LightningDataModule):
         # Model seeding uses the RankSpecificSeedCallback instead of
         # pl.seed_everything(workers=True), so this function is passed explicitly here.
         worker_init_fn = partial(pl_worker_init_function, rank=self.global_rank)
-
+        logger.debug(f"Creating {mode} dataloader: num_workers={num_workers}, rank={self.global_rank}.")
         return DataLoader(
             dataset=self.datasets_by_mode[mode],
             batch_size=self.batch_size,

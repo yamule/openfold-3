@@ -14,6 +14,7 @@
 
 import dataclasses
 import logging
+import os
 import random
 import traceback
 from collections import Counter
@@ -30,6 +31,7 @@ from openfold3.core.data.framework.single_datasets.base_of3 import (
 )
 from openfold3.core.data.framework.single_datasets.dataset_utils import (
     check_invalid_feature_dict,
+    getitem_debug_log,
 )
 from openfold3.core.data.pipelines.featurization.loss_weights import (
     set_loss_weights_for_disordered_set,
@@ -254,6 +256,7 @@ class WeightedPDBDataset(BaseOF3Dataset):
             return features
         else:
             try:
+                getitem_debug_log("WeightedPDBDataset")
                 sample_data = self.create_all_features(
                     pdb_id=pdb_id,
                     preferred_chain_or_interface=preferred_chain_or_interface,
