@@ -33,7 +33,6 @@ Make your first predictions with OpenFold3-preview in a few easy steps:
 1. Install OpenFold3-preview using our pip package
 ```bash
 pip install openfold3 
-mamba install kalign2 -c bioconda
 ```
 
 2. Setup your installation of OpenFold3-preview and download model parameters:
