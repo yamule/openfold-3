@@ -8,6 +8,7 @@ name = "openfold3"
 version = "0.3.1"
 dependencies = [
   "awscli",
+  "awscrt",
   "torch",# ==2.5.1",
   "pytorch-lightning >=2.1",
   "numpy",
@@ -160,4 +161,23 @@ python_files = ["test_*.py"]
 markers = [
     "inference_verification: Tests to verify installation on inference example",
     "slow: Large size test"
+]
+
+# Exclude directories during collection
+[tool.coverage.run]
+omit = [
+    "openfold3/tests/*",
+]
+
+# Exclude directories from reporting
+[tool.coverage.report]
+omit = [
+    "openfold3/tests/*",
+]
+
+# Map /opt/openfold3/openfold3/ (docker path) to openfold3/ (local path) during `coverage combine`
+[tool.coverage.paths]
+source = [
+    "openfold3/",
+    "/opt/openfold3/openfold3/",
 ]
