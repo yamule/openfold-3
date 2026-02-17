@@ -105,11 +105,12 @@ def test_find_pairing_indices(count_array, pairing_masks, expected):
                 [
                     [0, 0],
                     [0, 0],
-                    [1, 1],
-                    [1, 1],
                 ]
             ),  # Only first 2 rows included (S0), S1 excluded
             id="max_rows_2",
+            marks=pytest.mark.xfail(
+                reason="known bug: truncation was no correctly applied on the output array. However, the downstream sort_subsample_paired_row_ids covered this up."
+            ),
         ),
         pytest.param(
             4,
