@@ -130,7 +130,9 @@ def setup_param_directory(
 def download_parameters(param_dir) -> None:
     """Perform the parameter download."""
     logger.info("Starting parameter download...")
-    download_model_parameters(Path(param_dir), DEFAULT_CHECKPOINT_NAME)
+    download_model_parameters(
+        Path(param_dir), DEFAULT_CHECKPOINT_NAME, force_download=True
+    )
     logger.info("Download completed successfully.")
 
 

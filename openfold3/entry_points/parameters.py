@@ -14,6 +14,8 @@
 
 import logging
 from pathlib import Path
+from func_timeout import func_timeout, FunctionTimedOut
+
 
 from openfold3.core.utils.s3 import download_s3_file
 
@@ -33,6 +35,7 @@ DEFAULT_CHECKPOINT_NAME = "openfold3_p2_v1"
 def download_model_parameters(
     download_dir: Path,
     parameter_name: str,
+    force_download: bool = False,
 ) -> None:
     """Download OpenFold3 model parameters from S3 if not already present.
 
@@ -47,14 +50,25 @@ def download_model_parameters(
     target_path = download_dir / checkpoint_file_name
     CHECKPOINT_S3_KEY = f"staging/{checkpoint_file_name}"
 
-    if target_path.exists():
+    if target_path.exists() and not force_download:
         logger.info("Parameters already present at %s", target_path)
         return
 
-    confirm = input(
-        f"Download {CHECKPOINT_S3_KEY} from s3://{OPENFOLD_BUCKET} "
-        f"to {target_path}? (yes/no): "
-    )
+    _TIMEOUT_LEN = 120
+    try:
+        confirm = func_timeout(
+            _TIMEOUT_LEN,
+            input,
+            args=[
+                f"Download {CHECKPOINT_S3_KEY} from s3://{OPENFOLD_BUCKET} "
+                f"to {target_path}? (yes/no): "
+            ],
+        )
+    except FunctionTimedOut as timeout_error:
+        raise TimeoutError(
+            f"No input received within timeout of {_TIMEOUT_LEN}. Download cancelled."
+            " Consider using `setup_openfold` for initial setup of model parameters."
+        ) from timeout_error
 
     if confirm.lower() in ["yes", "y"]:
         download_s3_file(OPENFOLD_BUCKET, CHECKPOINT_S3_KEY, target_path)
