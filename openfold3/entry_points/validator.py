@@ -387,38 +387,57 @@ class InferenceExperimentConfig(ExperimentConfig):
         return data
 
     @model_validator(mode="after")
-    def _try_default_ckpt_path(self):
+    def validate_ckpt_settings(self):
+        """Validates inference_ckpt_path and inference_ckpt name settings."""
         if isinstance(self.inference_ckpt_path, Path):
             if self.inference_ckpt_path.exists():
                 return self
             raise ValueError(
                 f"Provided checkpoint path {self.inference_ckpt_path} does not exist"
             )
-        elif self.inference_ckpt_path is None:
-            # Set the parameters directory
-            if (Path(self.cache_path) / CHECKPOINT_ROOT_FILENAME).exists():
-                param_dir = Path(
-                    (self.cache_path / CHECKPOINT_ROOT_FILENAME).read_text().strip()
-                )
-            else:
-                param_dir = Path(self.cache_path)
-
-            # Set the default inference_ckpt_name if it was empty
-            if self.inference_ckpt_name is None:
-                self.inference_ckpt_name = DEFAULT_CHECKPOINT_NAME
-
-            path_to_ckpt = (
-                param_dir / OPENFOLD_MODEL_CHECKPOINT_REGISTRY[self.inference_ckpt_name]
+        elif self.inference_ckpt_name is None:
+            logger.info(
+                "No inference ckpt path or name provided, using default checkpoint."
             )
+            self.inference_ckpt_name = DEFAULT_CHECKPOINT_NAME
+            return self
 
-            # Write ckpt_root file and download parameters if not present
-            if not path_to_ckpt.exists():
-                ckpt_root_file = self.cache_path / CHECKPOINT_ROOT_FILENAME
-                logger.info("Storing path to OpenFold parameters in %s", ckpt_root_file)
-                with open(ckpt_root_file, "w") as f:
-                    f.write(str(param_dir))
-                download_model_parameters(param_dir, self.inference_ckpt_name)
-            self.inference_ckpt_path = path_to_ckpt
+    @model_validator(mode="after")
+    def _try_default_ckpt_path(self):
+        """Attempt to use default checkpoint.
+
+        Because this check runs after `validate_ckpt_settings`, no inference_ckpt_path
+        is provided by the user. This function will
+        1) Attempt to find the checkpoints in the path specified by
+           `cache_path` / `CHECKPOINT_ROOT_FILENAME`,
+        2) If not found, attempt to download the checkpoints to `cache_path` and
+           write the checkpoint root file.
+        3) Set the inference_ckpt_path to the found or downloaded checkpoint path.
+        """
+        # Set the parameters directory based on path in root file if provided.
+        if (Path(self.cache_path) / CHECKPOINT_ROOT_FILENAME).exists():
+            param_dir = Path(
+                (self.cache_path / CHECKPOINT_ROOT_FILENAME).read_text().strip()
+            )
+        else:
+            # Write ckpt_root file parameters if not present
+            param_dir = Path(self.cache_path)
+            ckpt_root_file = self.cache_path / CHECKPOINT_ROOT_FILENAME
+            logger.info(
+                f"Storing path to OpenFold parameters {param_dir} in {ckpt_root_file}"
+            )
+            with open(ckpt_root_file, "w") as f:
+                f.write(str(param_dir))
+
+        path_to_ckpt = (
+            param_dir / OPENFOLD_MODEL_CHECKPOINT_REGISTRY[self.inference_ckpt_name]
+        )
+
+        if not path_to_ckpt.exists():
+            download_model_parameters(param_dir, self.inference_ckpt_name)
+
+        self.inference_ckpt_path = path_to_ckpt
+
         return self
 
     @model_validator(mode="after")
