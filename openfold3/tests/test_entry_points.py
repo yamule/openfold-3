@@ -25,6 +25,7 @@ import ml_collections as mlc
 import pytest
 from pytorch_lightning.loggers import WandbLogger
 
+from openfold3 import setup_openfold
 from openfold3.core.config import config_utils
 from openfold3.core.data.framework.data_module import DataModuleConfig
 from openfold3.entry_points.experiment_runner import (
@@ -32,8 +33,12 @@ from openfold3.entry_points.experiment_runner import (
     TrainingExperimentRunner,
     WandbHandler,
 )
+from openfold3.entry_points.parameters import (
+    CHECKPOINT_ROOT_FILENAME,
+    DEFAULT_CHECKPOINT_NAME,
+    OPENFOLD_MODEL_CHECKPOINT_REGISTRY,
+)
 from openfold3.entry_points.validator import (
-    CHECKPOINT_NAME,
     InferenceExperimentConfig,
     TrainingExperimentConfig,
     TrainingExperimentSettings,
@@ -56,6 +61,11 @@ def _create_fake_file(path: Path) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         f.write("dummy content")
+
+
+def _fake_download_s3_file(unused_bucket: str, unused_key: str, local_path: Path):
+    local_path.parent.mkdir(parents=True, exist_ok=True)
+    local_path.touch()
 
 
 class TestTrainingExperiment:
@@ -528,12 +538,44 @@ class TestInferenceCheckpointLoading:
     def test_inference_ckpt_path_defaults(self, tmp_path):
         with (
             patch("builtins.input", return_value="yes"),
-            patch("openfold3.entry_points.download_parameters.download_s3_file"),
+            patch(
+                "openfold3.entry_points.parameters.download_s3_file",
+                side_effect=_fake_download_s3_file,
+            ),
         ):
             expt_config = InferenceExperimentConfig.model_validate(
                 {"cache_path": tmp_path}
             )
-        assert expt_config.inference_ckpt_path == tmp_path / CHECKPOINT_NAME
+
+        expected_ckpt_path = (
+            tmp_path / OPENFOLD_MODEL_CHECKPOINT_REGISTRY[DEFAULT_CHECKPOINT_NAME]
+        )
+        assert expt_config.inference_ckpt_name == DEFAULT_CHECKPOINT_NAME
+        assert expt_config.inference_ckpt_path == expected_ckpt_path
+        assert expt_config.inference_ckpt_path.exists()
+
+    def test_loads_selected_ckpt_name(self, tmp_path):
+        # Introduce a dummy checkpoint into the registry to test if it can be selected
+        selected_ckpt_name = "dummy_ckpt"
+        with (
+            patch.dict(
+                "openfold3.entry_points.parameters.OPENFOLD_MODEL_CHECKPOINT_REGISTRY",
+                {"dummy_ckpt": "dummy_checkpoint.pt"},
+            ),
+            patch("builtins.input", return_value="yes"),
+            patch(
+                "openfold3.entry_points.parameters.download_s3_file",
+                side_effect=_fake_download_s3_file,
+            ),
+        ):
+            expt_config = InferenceExperimentConfig.model_validate(
+                {"cache_path": tmp_path, "inference_ckpt_name": selected_ckpt_name}
+            )
+
+        expected_ckpt_path = tmp_path / "dummy_checkpoint.pt"
+        assert expt_config.inference_ckpt_name == selected_ckpt_name
+        assert expt_config.inference_ckpt_path == expected_ckpt_path
+        assert expected_ckpt_path.exists()
 
 
 class TestTemplatePreprocessorSettings:
@@ -639,3 +681,32 @@ class TestRemoveQuerySetDuplicates:
         )
 
         assert set(deduplicated_set.queries.keys()) == set(["query_2", "query_3"])
+
+
+class TestSetupOpenFold:
+    def test_fresh_parameter_download(self, tmp_path):
+        inputs = iter(
+            [
+                str(tmp_path),  # Set cache directory
+                "",  # Use default (cache) directory for params directory
+                "1",  # download choice: default checkpoint only
+                "no",  # skip integration tests
+            ]
+        )
+
+        with (
+            patch("builtins.input", side_effect=inputs),
+            patch(
+                "openfold3.setup_openfold.download_s3_file",
+                side_effect=_fake_download_s3_file,
+            ),
+        ):
+            setup_openfold.main()
+
+        # Check that the checkpoint root file exists and has the expected path
+        assert (tmp_path / CHECKPOINT_ROOT_FILENAME).exists()
+        assert (tmp_path / CHECKPOINT_ROOT_FILENAME).read_text() == str(tmp_path)
+        # Check that dummy checkpoint file has been installed correctly
+        assert (
+            tmp_path / OPENFOLD_MODEL_CHECKPOINT_REGISTRY[DEFAULT_CHECKPOINT_NAME]
+        ).exists()
