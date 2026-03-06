@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 
 from func_timeout import FunctionTimedOut, func_timeout
@@ -26,9 +27,22 @@ CHECKPOINT_ROOT_FILENAME = "ckpt_root"
 
 OPENFOLD_BUCKET = "openfold"
 
+class CheckpointEntry(dataclass(frozen=True)):
+    file_name: str
+    version_compatibility: str | None = None  # e.g. ">=0.4", "<0.4"
+
+
 OPENFOLD_MODEL_CHECKPOINT_REGISTRY = {
-    "openfold3_p2_v1": "of3-p2-v1.pt",
+    "openfold3_p1": CheckpointEntry(
+        file_name="of3_ft3_v1.pt",
+        version_compatibility="<0.4"
+    ),
+    "openfold3_p2_v1": CheckpointEntry(
+        file_name="of3-p2-v1.pt",
+        version_compatibility=">=0.4"
+    ),
 }
+
 DEFAULT_CHECKPOINT_NAME = "openfold3_p2_v1"
 
 
@@ -50,7 +64,7 @@ def download_model_parameters(
     """
     download_dir = Path(download_dir)
 
-    checkpoint_file_name = OPENFOLD_MODEL_CHECKPOINT_REGISTRY[parameter_name]
+    checkpoint_file_name = OPENFOLD_MODEL_CHECKPOINT_REGISTRY[parameter_name].file_name
     target_path = download_dir / checkpoint_file_name
     checkpoint_s3_key = f"staging/{checkpoint_file_name}"
 

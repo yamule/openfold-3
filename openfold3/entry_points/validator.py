@@ -434,7 +434,7 @@ class InferenceExperimentConfig(ExperimentConfig):
                 f.write(str(param_dir))
 
         path_to_ckpt = (
-            param_dir / OPENFOLD_MODEL_CHECKPOINT_REGISTRY[self.inference_ckpt_name]
+            param_dir / OPENFOLD_MODEL_CHECKPOINT_REGISTRY[self.inference_ckpt_name].file_name
         )
 
         if not path_to_ckpt.exists():

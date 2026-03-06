@@ -35,6 +35,7 @@ from openfold3.entry_points.experiment_runner import (
 )
 from openfold3.entry_points.parameters import (
     CHECKPOINT_ROOT_FILENAME,
+    CheckpointEntry,
     DEFAULT_CHECKPOINT_NAME,
     OPENFOLD_MODEL_CHECKPOINT_REGISTRY,
 )
@@ -548,7 +549,7 @@ class TestInferenceCheckpointLoading:
             )
 
         expected_ckpt_path = (
-            tmp_path / OPENFOLD_MODEL_CHECKPOINT_REGISTRY[DEFAULT_CHECKPOINT_NAME]
+            tmp_path / OPENFOLD_MODEL_CHECKPOINT_REGISTRY[DEFAULT_CHECKPOINT_NAME].file_name
         )
         assert expt_config.inference_ckpt_name == DEFAULT_CHECKPOINT_NAME
         assert expt_config.inference_ckpt_path == expected_ckpt_path
@@ -560,7 +561,7 @@ class TestInferenceCheckpointLoading:
         with (
             patch.dict(
                 "openfold3.entry_points.parameters.OPENFOLD_MODEL_CHECKPOINT_REGISTRY",
-                {"dummy_ckpt": "dummy_checkpoint.pt"},
+                {"dummy_ckpt": CheckpointEntry(file_name="dummy_checkpoint.pt")},
             ),
             patch("builtins.input", return_value="yes"),
             patch(
@@ -708,5 +709,5 @@ class TestSetupOpenFold:
         assert (tmp_path / CHECKPOINT_ROOT_FILENAME).read_text() == str(tmp_path)
         # Check that dummy checkpoint file has been installed correctly
         assert (
-            tmp_path / OPENFOLD_MODEL_CHECKPOINT_REGISTRY[DEFAULT_CHECKPOINT_NAME]
+            tmp_path / OPENFOLD_MODEL_CHECKPOINT_REGISTRY[DEFAULT_CHECKPOINT_NAME].file_name
         ).exists()

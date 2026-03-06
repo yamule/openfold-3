@@ -71,7 +71,7 @@ def setup_param_directory(
 
     # Check if parameters have already been downloaded
     ckpt_path = ckpt_root_file.read_text().strip() if ckpt_root_file.exists() else None
-    checkpoint_file_name = OPENFOLD_MODEL_CHECKPOINT_REGISTRY[DEFAULT_CHECKPOINT_NAME]
+    checkpoint_file_name = OPENFOLD_MODEL_CHECKPOINT_REGISTRY[DEFAULT_CHECKPOINT_NAME].file_name
     if ckpt_path and (Path(ckpt_path) / checkpoint_file_name).exists():
         existing_path = Path(ckpt_root_file.read_text().strip())
         logger.info(
