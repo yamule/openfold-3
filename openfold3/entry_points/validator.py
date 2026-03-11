@@ -32,11 +32,11 @@ from openfold3.core.data.pipelines.preprocessing.template import (
 )
 from openfold3.core.data.tools.colabfold_msa_server import MsaComputationSettings
 from openfold3.entry_points.parameters import (
-    CHECKPOINT_ROOT_FILENAME,
     DEFAULT_CACHE_PATH,
     DEFAULT_CHECKPOINT_NAME,
     OPENFOLD_MODEL_CHECKPOINT_REGISTRY,
     download_model_parameters,
+    get_default_checkpoint_dir,
 )
 from openfold3.projects.of3_all_atom.config.dataset_configs import (
     InferenceDatasetConfigKwargs,
@@ -452,21 +452,7 @@ class InferenceExperimentConfig(ExperimentConfig):
         if self.inference_ckpt_path is not None:
             return self
 
-        # Set the parameters directory based on path in the ckpt_root file if provided.
-        if (Path(self.cache_path) / CHECKPOINT_ROOT_FILENAME).exists():
-            param_dir = Path(
-                (self.cache_path / CHECKPOINT_ROOT_FILENAME).read_text().strip()
-            )
-        else:
-            # Write ckpt_root file if none exists
-            param_dir = Path(self.cache_path)
-            ckpt_root_file = self.cache_path / CHECKPOINT_ROOT_FILENAME
-            logger.info(
-                f"Storing path to OpenFold parameters {param_dir} in {ckpt_root_file}"
-            )
-            with open(ckpt_root_file, "w") as f:
-                f.write(str(param_dir))
-
+        param_dir = get_default_checkpoint_dir(cache_path=self.cache_path)
         path_to_ckpt = (
             param_dir
             / OPENFOLD_MODEL_CHECKPOINT_REGISTRY[self.inference_ckpt_name].file_name

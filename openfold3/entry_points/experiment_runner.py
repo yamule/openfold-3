@@ -657,6 +657,23 @@ class InferenceExperimentRunner(ExperimentRunner):
 
         return deduplicated_inference_set
 
+    def _warn_on_missing_version_tensor_in_load_statedict(
+        self, state_dict: dict
+    ) -> None:
+        """Load state dict, warning if only version_tensor is missing."""
+        try:
+            self.lightning_module.load_state_dict(state_dict, strict=True)
+        except RuntimeError as e:
+            if 'Missing key(s) in state_dict: "model.version_tensor".' in str(e):
+                logger.warning(
+                    "No version_tensor is found for this checkpoint."
+                    "Assuming the user knows checkpoints are parameters are compatible,"
+                    " continuing..."
+                )
+                self.lightning_module.load_state_dict(state_dict, strict=False)
+            else:
+                raise
+
     def setup(self) -> None:
         """Set up environment and load checkpoints."""
         super().setup()
@@ -665,7 +682,7 @@ class InferenceExperimentRunner(ExperimentRunner):
         logger.info(f"Loading weights from {self.ckpt_path}")
         ckpt = load_checkpoint(self.ckpt_path)
         state_dict, _ = get_state_dict_from_checkpoint(ckpt, init_from_ema_weights=True)
-        self.lightning_module.load_state_dict(state_dict, strict=True)
+        self._warn_on_missing_version_tensor_in_load_statedict(state_dict)
 
     def run(self, inference_query_set) -> None:
         """Set up the experiment environment."""

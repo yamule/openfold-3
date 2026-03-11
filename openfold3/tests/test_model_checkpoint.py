@@ -13,14 +13,39 @@
 # limitations under the License.
 
 import textwrap
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest  # noqa: F401  - used for pytest tmp fixture
 import torch
 
 from openfold3.core.config import config_utils
 from openfold3.core.utils.checkpoint_loading_utils import load_checkpoint
-from openfold3.entry_points.experiment_runner import TrainingExperimentRunner
-from openfold3.entry_points.validator import TrainingExperimentConfig
+from openfold3.entry_points.experiment_runner import (
+    InferenceExperimentRunner,
+    TrainingExperimentRunner,
+)
+from openfold3.entry_points.parameters import (
+    DEFAULT_CHECKPOINT_NAME,
+    OPENFOLD_MODEL_CHECKPOINT_REGISTRY,
+    get_default_checkpoint_dir,
+)
+from openfold3.entry_points.validator import (
+    InferenceExperimentConfig,
+    TrainingExperimentConfig,
+)
+
+
+@pytest.fixture
+def default_ckpt_path():
+    param_dir = get_default_checkpoint_dir()
+    default_ckpt_path = Path(
+        param_dir
+        / OPENFOLD_MODEL_CHECKPOINT_REGISTRY[DEFAULT_CHECKPOINT_NAME].file_name
+    )
+    if not default_ckpt_path.exists():
+        pytest.skip("Default checkpoint not found; skipping test.")
+    return default_ckpt_path
 
 
 class TestOF3ModelCheckpointing:
@@ -103,3 +128,44 @@ class TestOF3ModelCheckpointing:
         )
 
         assert actual_version_number == expected_version_number
+
+    def test_load_model_ckpt_with_no_version_warns(self, tmp_path, default_ckpt_path):
+        """Test that warning is raised if version_tensor is the only key that is missing."""
+
+        # Load checkpoint and remove version_tensor from EMA params
+        ckpt = load_checkpoint(default_ckpt_path)
+        ckpt.pop("version_tensor", None)
+        ckpt_with_no_version_path = tmp_path / "model_weights_no_version.ckpt"
+        torch.save(ckpt, ckpt_with_no_version_path)
+
+        # Load via InferenceExperimentRunner and assert the warning is issued
+        inference_config = InferenceExperimentConfig.model_validate(
+            {"inference_ckpt_path": ckpt_with_no_version_path}
+        )
+        inference_runner = InferenceExperimentRunner(inference_config)
+        with patch("openfold3.entry_points.experiment_runner.logger") as mock_logger:
+            inference_runner.setup()
+        warning_messages = [call.args[0] for call in mock_logger.warning.call_args_list]
+        assert any("version_tensor" in msg for msg in warning_messages)
+
+    def test_load_model_ckpt_with_missing_fields_fails(
+        self, tmp_path, default_ckpt_path
+    ):
+        # Create a model checkpoint missing input_embedder param field
+        # Check that model loading fails
+        ckpt = load_checkpoint(default_ckpt_path)
+        ckpt.pop("version_tensor", None)
+        ckpt.pop(
+            "input_embedder.atom_attn_enc.ref_atom_feature_embedder.linear_ref_pos.weight",
+            None,
+        )
+        bad_ckpt_with_missing_fields = tmp_path / "bad.ckpt"
+        torch.save(ckpt, bad_ckpt_with_missing_fields)
+
+        # Load via InferenceExperimentRunner and assert the warning is issued
+        inference_config = InferenceExperimentConfig.model_validate(
+            {"inference_ckpt_path": bad_ckpt_with_missing_fields}
+        )
+        inference_runner = InferenceExperimentRunner(inference_config)
+        with pytest.raises(RuntimeError):
+            inference_runner.setup()
