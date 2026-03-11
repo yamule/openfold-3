@@ -72,7 +72,6 @@ warnings.filterwarnings(
 )
 
 REFERENCE_CONFIG_PATH = Path(__file__).parent.resolve() / "config/reference_config.yml"
-MODEL_VERSION = torch.tensor([1, 0, 0], dtype=torch.float32)
 
 
 class OpenFold3AllAtom(ModelRunner):
@@ -101,12 +100,9 @@ class OpenFold3AllAtom(ModelRunner):
             self.automatic_optimization = False
             self.log_lr = model_config.settings.manual_optimization.log_lr
 
-        # Register a version number as a float to be compatible with EMA updates.
-        self.register_buffer("version_tensor", MODEL_VERSION)
-
     @property
     def version(self):
-        v = self.version_tensor.long().tolist()
+        v = self.model.version_tensor.long().tolist()
         return f"{v[0]}.{v[1]}.{v[2]}"
 
     def setup(self, stage: str):
