@@ -21,7 +21,7 @@ The OpenFold3 inference pipeline takes a single JSON file as input, specifying t
 **Reference Fields**
 - `seeds` *(list, reference)*
   - This section is present in the logged `inference_query_set.json` that is part of the model run output as a reference of the seeds used.
-  - However, this field should not be included as part of the input of an input `query.json`. Instead, the user should use either the `--num_model_seeds` command line argument or specify seeds in the `runner.yml`. See {ref}`Custom Model Seeds for more details <custom-random-seeds-inference>` 
+  - However, this field should not be included as part of the input of an input `query.json`. Instead, the user should use either the `--num-model-seeds` command line argument or specify seeds in the `runner.yml`. See {ref}`Custom Model Seeds for more details <custom-random-seeds-inference>` 
 
 (2-queries)=
 ## 2. Queries

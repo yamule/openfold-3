@@ -29,7 +29,7 @@ setup_openfold
 ``` 
 3. Make your first prediction with:
 ```bash
-run_openfold predict --query_json=examples/example_inference_inputs/query_ubiquitin.json
+run_openfold predict --query-json=examples/example_inference_inputs/query_ubiquitin.json
 ```
 
 
@@ -79,6 +79,7 @@ debugging_how_to
 :caption: Reference 
 :hidden: 
 
+parameters_reference
 input_format_reference
 configuration_reference
 data_pipeline_reference

@@ -122,5 +122,5 @@ dataset_paths:
 
 
 ```bash
-run_openfold train --runner_yaml training.yaml --seed 42
+run_openfold train --runner-yaml training.yaml --seed 42
 ```

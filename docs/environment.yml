@@ -6,3 +6,4 @@ dependencies:
   - myst-parser
   - furo
   - sphinx-autobuild
+  - sphinxcontrib-mermaid

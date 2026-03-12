@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_CACHE_PATH = Path("~/.openfold3/").expanduser()
 CHECKPOINT_ROOT_FILENAME = "ckpt_root"
 
-OPENFOLD_BUCKET = "openfold"
+OPENFOLD_BUCKET = "openfold3-data"
 
 
 @dataclass(frozen=True)
@@ -36,15 +36,18 @@ class CheckpointEntry:
 
 
 OPENFOLD_MODEL_CHECKPOINT_REGISTRY = {
-    "openfold3_p1": CheckpointEntry(
+    "openfold3-p1": CheckpointEntry(
         file_name="of3_ft3_v1.pt", version_compatibility="<0.4"
     ),
-    "openfold3_p2_v1": CheckpointEntry(
-        file_name="of3-p2-v1.pt", version_compatibility=">=0.4"
+    "openfold3-p2-145k": CheckpointEntry(
+        file_name="of3-p2-145k.pt", version_compatibility=">=0.4"
+    ),
+    "openfold3-p2-155k": CheckpointEntry(
+        file_name="of3-p2-155k.pt", version_compatibility=">=0.4"
     ),
 }
 
-DEFAULT_CHECKPOINT_NAME = "openfold3_p2_v1"
+DEFAULT_CHECKPOINT_NAME = "openfold3-p2-155k"
 
 
 def download_model_parameters(
@@ -67,7 +70,7 @@ def download_model_parameters(
 
     checkpoint_file_name = OPENFOLD_MODEL_CHECKPOINT_REGISTRY[parameter_name].file_name
     target_path = download_dir / checkpoint_file_name
-    checkpoint_s3_key = f"staging/{checkpoint_file_name}"
+    checkpoint_s3_key = f"openfold3-parameters/{checkpoint_file_name}"
 
     if target_path.exists() and not force_download:
         logger.info("Parameters already present at %s", target_path)

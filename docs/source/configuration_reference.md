@@ -104,6 +104,9 @@ model_update:
 - `inference_ckpt_path` *(Path | None)*: Path to model checkpoint file (`.pt` file)
   - Default: `$HOME/.openfold3/of3_ft3_v1.pt`
   - Will download parameters if not present
+- `inference_ckpt_name` *(str | None)*: Name of the model checkpoint to use.
+  - Default: `openfold3_p2_v1`
+  - Must be a key in `OPENFOLD_MODEL_CHECKPOINT_REGISTRY`(https://github.com/aqlaboratory/openfold-3/blob/main/openfold3/entry_points/parameters.py#L29)
 - `cache_path` *(Path | None)*: Directory for storing cached model parameters
   - Default: `$HOME/.openfold3/`
 
