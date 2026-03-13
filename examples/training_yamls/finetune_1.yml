@@ -259,11 +259,11 @@ dataset_paths:
   RNA-monomer-distillation:
     alignments_directory: null
     alignment_db_directory: null
-    alignment_array_directory: /shared/openfold3/rna_monomer_distillation_set/rna_monomer_preprocessed_cache
-    target_structures_directory: /shared/openfold3/rna_monomer_distillation_set/rna_monomer_preprocessed_cache
+    alignment_array_directory: /shared/openfold3/rna_distillation_set/RNA_distill_BLAS_msas
+    target_structures_directory: /shared/openfold3/rna_distillation_set/structure_files
     target_structure_file_format: npz
-    dataset_cache_file: /shared/openfold3/rna_monomer_distillation_set/training_cache_RNA_monomer.json
-    reference_molecule_directory: /shared/openfold3/rna_monomer_distillation_set/reference_mols
+    dataset_cache_file: /shared/openfold3/rna_distillation_set/training_cache_RNA_monomer.json
+    reference_molecule_directory: /shared/openfold3/rna_distillation_set/reference_mols
     template_structures_directory: null
     template_file_format: npz
     ccd_file: null
