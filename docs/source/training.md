@@ -11,7 +11,8 @@ Welcome to the training documentation for OpenFold3. This guide covers how to tr
 The pre-processed PDB training dataset is hosted on AWS S3. Download it using the AWS CLI:
 
 ```bash
-aws s3 sync s3://openfold3-data/of3_dataset_releases/af3_training_data_v14_reupload/ /shared/openfold3/pdb_dataset_releases/v14/
+aws s3 sync s3://openfold3-data/pdb_training_set/ /shared/openfold3/pdb_training_set/ --no-sign-request
+
 ```
 
 ## 3. Prepare the Training Config
@@ -20,8 +21,7 @@ The training configuration is stored in a YAML file that controls all aspects of
 
 **Note:** Make sure you update the paths to match your file locations. The examples below assume a `/shared/openfold3` directory that's accessible from all your training nodes.
 
-Example training YAML configurations are available in [examples/training_yamls/](https://github.com/aqlaboratory/openfold-3/tree/main/examples/training_yamls).
-
+Complete example YAML configurations for all stages of training are available in [examples/training_yamls/](https://github.com/aqlaboratory/openfold-3/tree/main/examples/training_yamls).
 
 ### 3.1 Basic Training Config
 
@@ -31,13 +31,12 @@ Here's a minimal configuration for single-GPU training:
 experiment_settings:
   mode: train
   output_dir: ./test_train_output 
-  seed: 1272025
   restart_checkpoint_path: last
 
 data_module_args:
   batch_size: 1
   num_workers: 1
-  epoch_len: 128000
+  epoch_len: 500  # Ckpt every 500 steps (effective batch_size * # of steps)
 
 logging_config:
   log_lr: false
@@ -49,8 +48,6 @@ pl_trainer_args:
   precision: bf16-mixed
   max_epochs: -1
   log_every_n_steps: 50
-  mpi_plugin: false
-  deepspeed_config_path: null
 
 checkpoint_config:
   every_n_epochs: 1
@@ -66,7 +63,7 @@ dataset_configs:
   train:
     weighted-pdb:
       dataset_class: WeightedPDBDataset
-      weight: 0.5
+      weight: 1.0
       config:
         debug_mode: true
         template:
@@ -101,13 +98,13 @@ dataset_paths:
   weighted-pdb:
     alignments_directory: none
     alignment_db_directory: none 
-    alignment_array_directory: /shared/openfold3/pdb_dataset_releases/v14/alignment_arrays
-    dataset_cache_file: /shared/openfold3/pdb_dataset_releases/v14/training_cache_with_templates.json
-    target_structures_directory: /shared/openfold3/pdb_dataset_releases/v14/preprocessed_pdb/structure_files
+    alignment_array_directory: /shared/openfold3/pdb_training_set/alignment_arrays
+    dataset_cache_file: /shared/openfold3/pdb_training_set/dataset_caches/training_cache_with_templates.json
+    target_structures_directory: /shared/openfold3/pdb_training_set/preprocessed_pdb_data/standard/structure_files
     target_structure_file_format: npz
-    reference_molecule_directory: /shared/openfold3/pdb_dataset_releases/v14/preprocessed_pdb/reference_mols
-    template_cache_directory: /shared/openfold3/pdb_dataset_releases/v14/train_template_cache
-    template_structure_array_directory: /shared/openfold3/pdb_dataset_releases/v14/template_structure_arrays
+    reference_molecule_directory: /shared/openfold3/pdb_training_set/preprocessed_pdb_data/standard/reference_mols
+    template_cache_directory: /shared/openfold3/pdb_training_set/templates/train_template_cache
+    template_structure_array_directory: /shared/openfold3/pdb_training_set/templates/template_structure_arrays
     template_structures_directory: none
     template_file_format: npz
     ccd_file: null
@@ -115,17 +112,23 @@ dataset_paths:
   val-weighted-pdb:
     alignments_directory: none
     alignment_db_directory: none 
-    alignment_array_directory: /shared/openfold3/pdb_dataset_releases/v14/alignment_arrays
-    dataset_cache_file: /shared/openfold3/pdb_dataset_releases/v14/validation_cache_with_templates_with_ab_ag_no_err.json
-    target_structures_directory: /shared/openfold3/pdb_dataset_releases/v14/preprocessed_pdb/structure_files
+    alignment_array_directory: /shared/openfold3/pdb_training_set/alignment_arrays
+    dataset_cache_file: /shared/openfold3/pdb_training_set/dataset_caches/validation_cache_with_templates.json
+    target_structures_directory: /shared/openfold3/pdb_training_set/preprocessed_pdb_data/standard/structure_files
     target_structure_file_format: npz
-    reference_molecule_directory: /shared/openfold3/pdb_dataset_releases/v14/preprocessed_pdb/reference_mols
-    template_cache_directory: /shared/openfold3/pdb_dataset_releases/v14/val_template_cache
-    template_structure_array_directory: /shared/openfold3/pdb_dataset_releases/v14/template_structure_arrays
+    reference_molecule_directory: /shared/openfold3/pdb_training_set/preprocessed_pdb_data/standard/reference_mols
+    template_cache_directory: /shared/openfold3/pdb_training_set/templates/val_template_cache
+    template_structure_array_directory: /shared/openfold3/pdb_training_set/templates/template_structure_arrays
     template_structures_directory: none
     template_file_format: npz
     ccd_file: null
 ```
+
+For example configurations for all stages of training, please see [examples/training_yamls/](https://github.com/aqlaboratory/openfold-3/tree/main/examples/training_yamls):
+- `initial_training.yml`: Standard initial training configuration
+- `finetune_1.yml`: Fine-tuning stage 1 configuration
+- `finetune_2.yml`: Fine-tuning stage 2 configuration
+- `finetune_3.yml`: Fine-tuning stage 3 configuration (used in OF3p)
 
 ## 4. Launch Training
 
@@ -223,9 +226,3 @@ experiment_settings:
   seed: 42
   restart_checkpoint_path: /path/to/pretrained.ckpt
 ```
-
-See the fine-tuning example configurations in [examples/training_yamls/](https://github.com/aqlaboratory/openfold-3/tree/main/examples/training_yamls) for specific use cases like:
-
-- `finetune_1.yml`: Standard fine-tuning configuration
-- `finetune_2.yml`: Fine-tuning with modified cropping
-- `finetune_3.yml`: Fine-tuning with custom loss weights
