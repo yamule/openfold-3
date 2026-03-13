@@ -3,12 +3,12 @@
 ## 1. High-level Structure
 The OpenFold3 inference pipeline takes a single JSON file as input, specifying the data and options required for structure prediction. This file can define multiple prediction targets (`queries`), which can be proteins, including individual protein chains and complexes, nucleic acids, and ligands. Multiple queries can be combined as follows: 
 
-```json
+```text
 {
   "queries": {
     "query_1": { ... },
     "query_2": { ... }
-  },
+  }
 }
 ```
 
