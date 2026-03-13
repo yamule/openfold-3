@@ -73,7 +73,7 @@ The four strategies, tried in order:
 3. **`"use_fallback"`**: Idealized CCD coordinates (`pdbx_model_Cartn_*_ideal`).
 4. **`"use_fallback"`** (variation): Model-derived CCD coordinates if idealized ones are missing.
 
-Example entry:
+Example entries (a standard monomeric ligand and a disaccharide glycan):
 
 ```json
 "ATP": {
@@ -81,6 +81,12 @@ Example entry:
     "conformer_gen_strategy": "default",
     "fallback_conformer_pdb_id": null,
     "canonical_smiles": "Nc1ncnc2c1ncn2[C@@H]1O[C@H](CO[P@@](=O)(O)O[P@](=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]1O"
+},
+"2pvw_2": {
+    "residue_count": 2,
+    "conformer_gen_strategy": "default",
+    "fallback_conformer_pdb_id": null,
+    "canonical_smiles": "CC(=O)N[C@H]1[C@H](O[C@H]2[C@H](O)[C@@H](NC(C)=O)CO[C@@H]2CO)O[C@H](CO)[C@@H](O)[C@@H]1O"
 }
 ```
 
@@ -203,7 +209,7 @@ The `reference_molecule_data` section in the training cache carries over all fie
 
 | Field | Description |
 |---|---|
-| `set_fallback_to_nan` | Legacy field. Set to `true` when the fallback conformer coordinates originate from CCD model coordinates whose PDB-ID is outside the allowed training set date range (see `fallback_conformer_pdb_id`). `false` for all entries in practice. |
+| `set_fallback_to_nan` | Set to `true` when the fallback conformer coordinates originate from CCD model coordinates whose PDB-ID is outside the allowed training set date range (see `fallback_conformer_pdb_id`). `false` for all entries in practice. |
 
 ## Validation Cache
 
@@ -233,7 +239,11 @@ Example entry (subset of `7vl5` showing one protein chain, one ligand chain, and
             "molecule_type": "PROTEIN",
             "reference_mol_id": null,
             "alignment_representative_id": "7vl6_A",
-            "template_ids": ["5gsl_A", "5gsl_B", "6jow_A", "..."],
+            "template_ids": [
+                "5gsl_A",
+                "5gsl_B",
+                "6jow_A"
+            ],
             "cluster_id": "2024",
             "cluster_size": null,
             "low_homology": true,
@@ -241,7 +251,6 @@ Example entry (subset of `7vl5` showing one protein chain, one ligand chain, and
             "use_metrics": false,
             "ranking_model_fit": null,
             "source_subset": "base",
-            "sabdab_annotation": null
         },
         "3": {
             "label_asym_id": "C",
@@ -258,7 +267,6 @@ Example entry (subset of `7vl5` showing one protein chain, one ligand chain, and
             "use_metrics": false,
             "ranking_model_fit": 0.9312,
             "source_subset": "base",
-            "sabdab_annotation": null
         }
     },
     "interfaces": {
@@ -282,5 +290,4 @@ Additional fields compared to the training cache:
 | `metric_eligible` | Whether this chain/interface is eligible for metric computation. Requires low homology and, for ligand chains, sufficient model ranking fit. |
 | `use_metrics` | Whether this chain/interface is actually used for reporting metrics. A subset of `metric_eligible` entries, selected to balance the evaluation set. |
 | `ranking_model_fit` | Ligand model quality score from RCSB (0-1). `null` for non-ligand chains. Used to filter out poorly-modeled ligands. |
-| `source_subset` | Which validation subset this entry belongs to: `"base"` (available to both), `"multimer"`, or `"monomer"`. |
-| `sabdab_annotation` | Antibody annotation from SAbDab, if applicable. `null` for non-antibody chains. |
+| `source_subset` | Which validation subset this entry belongs to: `"base"` (available to both), `"multimer"`, or `"monomer"`. This is mostly for debugging purposes and refers to the specific AF3 validation building protocol |

@@ -63,6 +63,7 @@ kernels.md
 
 inference
 training
+data_pipeline_reference
 precomputed_msa_generation_how_to
 precomputed_msa_how_to
 template_how_to
@@ -82,7 +83,6 @@ debugging_how_to
 parameters_reference
 input_format_reference
 configuration_reference
-data_pipeline_reference
 ```
 
 ```{toctree}

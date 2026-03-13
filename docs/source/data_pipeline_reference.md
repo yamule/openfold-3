@@ -1,4 +1,4 @@
-# Training Data Pipeline
+# OpenFold3 Training Data Pipeline
 
 ## Overview
 
@@ -7,14 +7,21 @@ This guide walks through preparing PDB structure data for OpenFold3 training. Th
 All output files directly required as an input to the training script are **marked in bold with an asterisk (\*)**. There is full flexibility in modifying the pipeline as long as it generates these required outputs, though it's recommended to stick to the format below.
 
 ```{tip}
-For detailed format specifications, preprocessing internals, and guidance on adapting this pipeline to custom (non-PDB) data, see the {doc}`Understanding Dataset Caches <understanding_dataset_caches>`.
+For detailed format specifications on the metadata and training/validation dataset caches, see the extended doc at {doc}`Understanding Dataset Caches <understanding_dataset_caches>`.
 ```
 
-![Data Pipeline Overview](../imgs/data_pipeline_overview.png)
+```{figure} ../imgs/data_pipeline_overview.png
+:class: only-light
+:alt: Data Pipeline Overview
+```
+```{figure} ../imgs/data_pipeline_overview_dark.png
+:class: only-dark
+:alt: Data Pipeline Overview
+```
 
 ## 1. PDB Preprocessing
 ### 1.1 Structure Download
-Our structure preprocessing expects a flat directory of `.cif` files. We provide an example script to generate this at [scripts/download_pdb_mmcif.sh](https://github.com/aqlaboratory/openfold-3/blob/main/scripts/data_preprocssing/download_pdb_mmcif.sh).
+Our structure preprocessing expects a flat directory of `.cif` files. We provide an example script to generate this at [scripts/download_pdb_mmcif.sh](https://github.com/aqlaboratory/openfold-3/blob/main/scripts/data_preprocessing/download_pdb_mmcif.sh).
 
 ### 1.2 CCD Preprocessing (recommended but optional)
 
@@ -38,8 +45,6 @@ The core structure preprocessing converts raw PDB mmCIF files into an efficient 
 - **Extracting metadata** into a `metadata.json` with structure-level, chain-level, and interface-level information
 
 Script: [scripts/data_preprocessing/preprocess_pdb_of3.py](https://github.com/aqlaboratory/openfold-3/blob/main/scripts/data_preprocessing/preprocess_pdb_of3.py)
-
-For details on the individual parsing and cleanup steps, the metadata format, and the reference molecule processing, see the {doc}`Understanding Dataset Caches <understanding_dataset_caches>`.
 
 Output: per-structure directories with **NPZ\***, FASTA, and optionally CIF files, plus a **metadata.json\*** and **reference molecule SDF files\***:
 
@@ -70,7 +75,7 @@ AlphaFold3 training requires MSA generation against several sequence databases. 
 
 Script: [scripts/snakemake_msa/MSA_Snakefile](https://github.com/aqlaboratory/openfold-3/blob/main/scripts/snakemake_msa/MSA_Snakefile)
 
-Instructions on how to run are in the {doc}`MSA generation how-to <precomputed_msa_generation_how_to>`. To simplify inferring the sequences to run, the PDB structure preprocessing saves `.fasta` files with sequence information alongside every preprocessed structure. The script at [scripts/data_preprocessing/collect_preprocessed_fastas.py](https://github.com/aqlaboratory/openfold-3/blob/main/scripts/data_preprocessing/collect_preprocessed_fastas.py) and the [`consolidate_preprocessed_fastas`](https://github.com/aqlaboratory/openfold-3/blob/14e921c2dda9675064ad74d19a9edc7868ab75dd/openfold3/core/data/io/sequence/fasta.py#L70) utility may provide a helpful reference.
+Instructions on how to run are in the {doc}`MSA generation how-to <precomputed_msa_generation_how_to>`. To simplify inferring the sequences to run, the PDB structure preprocessing saves `.fasta` files with sequence information alongside every preprocessed structure. The script at [scripts/data_preprocessing/collect_preprocessed_fastas.py](https://github.com/aqlaboratory/openfold-3/blob/main/scripts/data_preprocessing/collect_preprocessed_fastas.py) and the [`consolidate_preprocessed_fastas`](https://github.com/aqlaboratory/openfold-3/blob/14e921c2dda9675064ad74d19a9edc7868ab75dd/openfold3/core/data/io/sequence/fasta.py#L70) utility may provide a helpful reference for collating these.
 
 ````{note}
 OpenFold3 infers the full sequence of polymers from the `pdbx_seq_one_letter_code_can` field and `_entity_poly_seq` records in order to add any unresolved atoms or residues explicitly to the preprocessed structures. This means that any gaps in the structure caused by unresolved residues should have an appropriate spacing in their residue IDs, and the residue ID numbers should match to the residue IDs of the full sequence of the construct incrementally numbered from 1. This works out of the box for PDB structures, but may need special consideration when fine-tuning on custom structures:
